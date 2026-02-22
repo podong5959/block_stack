@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Block Stack Survival</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Pretendard:wght@400;500;700;800&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <h1 class="app-title">Block Stack</h1>
+    <header class="hud">
+      <div class="hud-top-row">
+        <div class="hud-chip best-chip">
+          <span class="label">BEST</span>
+          <strong id="bestScoreValue">0</strong>
+        </div>
+        <div class="hud-chip score-chip">
+          <span class="label">점수</span>
+          <strong id="scoreValue">0</strong>
+        </div>
+        <button id="settingsButton" type="button" class="settings-btn" aria-label="설정">&#9881;</button>
+      </div>
+      <div class="collapse-wrap">
+        <div class="collapse-head">
+          <span>남은횟수</span>
+          <strong id="collapseValue">15</strong>
+        </div>
+      </div>
+    </header>
+
+    <section class="board-area">
+      <div id="board" class="board" aria-label="6x6 game board"></div>
+      <div id="gameOverLayer" class="game-over-layer hidden">
+        <div id="endingBoardFx" class="ending-board-fx" aria-hidden="true"></div>
+        <div id="endingCard" class="ending-card hidden">
+          <p class="ending-title">게임 종료</p>
+          <p id="endingReason" class="ending-reason"></p>
+          <p class="ending-score-label">달성 스코어</p>
+          <strong id="endingScoreValue" class="ending-score">0</strong>
+          <button id="endingContinueButton" type="button" class="ending-continue-btn">
+            횟수 5회 추가하기
+          </button>
+          <button id="endingNewGameButton" type="button" class="ending-new-btn">새로하기</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="controls">
+      <div id="currentBlockView" class="block-view"></div>
+      <button id="skipButton" type="button" class="skip-btn">스킵 (무료 1회)</button>
+    </section>
+
+    <p id="message" class="message">현재 블록을 드래그해서 보드에 놓으세요.</p>
+  </main>
+
+  <script src="./game.js"></script>
+</body>
+</html>

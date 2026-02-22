@@ -147,6 +147,7 @@ const state = {
   dragBoardMetrics: null,
   dragMoveRafId: null,
   pendingDragPoint: null,
+  dragPointerPos: null,
   previewKeys: new Set(),
   turnsPlayed: 0,
   gamesSinceAllClear: getGamesSinceAllClear(),
@@ -1448,6 +1449,7 @@ function endDragInteraction() {
     state.dragMoveRafId = null;
   }
   state.pendingDragPoint = null;
+  state.dragPointerPos = null;
   state.dragGrabOffset = { x: 0, y: 0 };
   state.dragGhostMetrics = { cellSize: 22, gap: 4 };
   state.dragBoardMetrics = null;
@@ -1932,6 +1934,20 @@ function moveDragGhost(clientX, clientY) {
   state.dragGhostEl.style.top = `${clientY - offsetY}px`;
 }
 
+function getDragGhostHandlePoint() {
+  if (!state.dragGhostEl) return null;
+  const { cellSize, gap } = state.dragGhostMetrics;
+  const offsetX = state.dragGrabOffset.x * (cellSize + gap) + cellSize / 2;
+  const offsetY = state.dragGrabOffset.y * (cellSize + gap) + cellSize / 2;
+  const left = Number.parseFloat(state.dragGhostEl.style.left || "0");
+  const top = Number.parseFloat(state.dragGhostEl.style.top || "0");
+  if (!Number.isFinite(left) || !Number.isFinite(top)) return null;
+  return {
+    x: left + offsetX,
+    y: top + offsetY,
+  };
+}
+
 function getBoardDragMetrics() {
   const metrics = state.dragBoardMetrics || readBoardMetrics();
   return {
@@ -1998,6 +2014,7 @@ function onDragStart(event) {
   ensureAudioContext();
   state.isDragging = true;
   state.dragPointerId = event.pointerId ?? null;
+  state.dragPointerPos = { x: event.clientX, y: event.clientY };
   state.dragGrabOffset = {
     x: Number(grabbedCell.dataset.dx || 0),
     y: Number(grabbedCell.dataset.dy || 0),
@@ -2010,7 +2027,7 @@ function onDragStart(event) {
   elements.message.textContent = state.message;
   const launchPoint = getBoardLaunchPoint();
   moveDragGhost(launchPoint.x, launchPoint.y);
-  updateHoverCell(null);
+  updateHoverCell(getAnchorFromPoint(launchPoint.x, launchPoint.y));
   document.body.classList.add("dragging-block");
 
   try {
@@ -2025,8 +2042,20 @@ function flushPendingDragMove() {
   if (!state.isDragging || !state.pendingDragPoint) return;
   const point = state.pendingDragPoint;
   state.pendingDragPoint = null;
-  moveDragGhost(point.x, point.y);
-  updateHoverCell(getAnchorFromPoint(point.x, point.y));
+  if (!state.dragPointerPos) {
+    state.dragPointerPos = point;
+    return;
+  }
+  const dx = point.x - state.dragPointerPos.x;
+  const dy = point.y - state.dragPointerPos.y;
+  state.dragPointerPos = point;
+
+  const handlePoint = getDragGhostHandlePoint();
+  if (!handlePoint) return;
+  const nextX = handlePoint.x + dx;
+  const nextY = handlePoint.y + dy;
+  moveDragGhost(nextX, nextY);
+  updateHoverCell(getAnchorFromPoint(nextX, nextY));
 }
 
 function onDragMove(event) {
@@ -2040,7 +2069,7 @@ function onDragMove(event) {
 function onDragEnd(event) {
   if (!state.isDragging) return;
   if (state.dragPointerId !== null && event.pointerId !== state.dragPointerId) return;
-  const dropCell = getAnchorFromPoint(event.clientX, event.clientY) || state.hoverCell;
+  const dropCell = state.hoverCell || getAnchorFromPoint(event.clientX, event.clientY);
   const canDrop = !!dropCell && canPlaceBlock(state.currentBlock, dropCell.x, dropCell.y);
   endDragInteraction();
 

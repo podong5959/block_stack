@@ -1954,6 +1954,16 @@ function createDragGhost(block, metrics) {
   return ghost;
 }
 
+function getBoardLaunchPoint() {
+  const metrics = state.dragBoardMetrics || readBoardMetrics();
+  const { rect, paddingY, gap, cellHeight } = metrics;
+  const launchY = rect.top + paddingY + (BOARD_SIZE - 1) * (cellHeight + gap) + cellHeight / 2;
+  return {
+    x: rect.left + rect.width / 2,
+    y: launchY,
+  };
+}
+
 function findNearestFilledMiniCell(clientX, clientY) {
   const filled = Array.from(elements.currentBlockView.querySelectorAll(".mini-cell.fill"));
   if (filled.length === 0) return null;
@@ -1998,8 +2008,9 @@ function onDragStart(event) {
   state.dragGhostEl = createDragGhost(state.currentBlock, state.dragGhostMetrics);
   elements.currentBlockView.classList.add("is-dragging");
   elements.message.textContent = state.message;
-  moveDragGhost(event.clientX, event.clientY);
-  updateHoverCell(getAnchorFromPoint(event.clientX, event.clientY));
+  const launchPoint = getBoardLaunchPoint();
+  moveDragGhost(launchPoint.x, launchPoint.y);
+  updateHoverCell(null);
   document.body.classList.add("dragging-block");
 
   try {

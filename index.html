@@ -25,7 +25,10 @@
           <span class="label">점수</span>
           <strong id="scoreValue">0</strong>
         </div>
-        <button id="settingsButton" type="button" class="settings-btn" aria-label="설정">&#9881;</button>
+        <div class="hud-actions">
+          <button id="rankingButton" type="button" class="icon-btn trophy-btn" aria-label="랭킹">🏆</button>
+          <button id="settingsButton" type="button" class="icon-btn settings-btn" aria-label="설정">&#9881;</button>
+        </div>
       </div>
       <div class="collapse-wrap">
         <div class="collapse-head">
@@ -59,6 +62,85 @@
 
     <p id="message" class="message">현재 블록을 드래그해서 보드에 놓으세요.</p>
   </main>
+
+  <div id="settingsModal" class="settings-modal hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <div id="settingsBackdrop" class="settings-backdrop"></div>
+    <section class="settings-panel">
+      <header class="settings-head">
+        <h2 id="settingsTitle">설정</h2>
+        <button id="settingsCloseButton" type="button" class="settings-close" aria-label="설정 닫기">닫기</button>
+      </header>
+
+      <section class="settings-section">
+        <h3>사운드 설정</h3>
+        <button id="soundSwitchButton" type="button" class="switch-btn">
+          <span class="switch-label">효과음</span>
+          <span class="switch-pill"><span class="switch-dot"></span></span>
+          <strong id="soundSwitchState" class="switch-state">ON</strong>
+        </button>
+        <button id="bgmSwitchButton" type="button" class="switch-btn">
+          <span class="switch-label">배경음악</span>
+          <span class="switch-pill"><span class="switch-dot"></span></span>
+          <strong id="bgmSwitchState" class="switch-state">ON</strong>
+        </button>
+      </section>
+
+      <section class="settings-section">
+        <button id="profileButton" type="button" class="profile-open-btn">프로필</button>
+        <div id="profilePanel" class="profile-panel hidden">
+          <h3>플레이어 아이디</h3>
+          <div class="player-id-row">
+            <input
+              id="playerIdInput"
+              type="text"
+              maxlength="16"
+              autocomplete="off"
+              placeholder="2~16자, 한글/영문/숫자/_/-"
+              readonly
+            />
+            <button id="editPlayerIdButton" type="button" class="icon-edit-btn" aria-label="아이디 수정">✎</button>
+          </div>
+          <button id="savePlayerIdButton" type="button" class="profile-save-btn hidden">저장</button>
+          <p class="settings-sub">현재 로그인 정보: <strong id="loginInfoValue">게스트</strong></p>
+          <button id="linkAccountButton" type="button" class="link-account-btn">계정 연동</button>
+          <div id="accountProvidersInfo" class="account-info hidden">
+            <p>연동 가능한 계정</p>
+            <ul>
+              <li>Google 로그인</li>
+              <li>Apple 로그인</li>
+              <li>Kakao 로그인</li>
+            </ul>
+          </div>
+          <p id="settingsNotice" class="settings-notice"></p>
+        </div>
+      </section>
+    </section>
+  </div>
+
+  <div id="rankingModal" class="ranking-modal hidden" role="dialog" aria-modal="true" aria-labelledby="rankingTitle">
+    <div id="rankingBackdrop" class="settings-backdrop"></div>
+    <section class="ranking-panel">
+      <header class="settings-head">
+        <h2 id="rankingTitle">랭킹</h2>
+        <button id="rankingCloseButton" type="button" class="settings-close" aria-label="랭킹 닫기">닫기</button>
+      </header>
+      <div class="ranking-tabs">
+        <button id="myRankTabButton" type="button" class="ranking-tab active">내 랭킹</button>
+        <button id="top10TabButton" type="button" class="ranking-tab">TOP 10</button>
+      </div>
+      <section id="myRankView" class="ranking-view">
+        <p class="my-rank-row">아이디 <strong id="myRankPlayerValue">-</strong></p>
+        <p class="my-rank-row">BEST 점수 <strong id="myRankScoreValue">0</strong></p>
+        <p class="my-rank-row">현재 순위 <strong id="myRankPositionValue">기록 없음</strong></p>
+      </section>
+      <section id="top10View" class="ranking-view hidden">
+        <div class="rank-head">
+          <h3>랭킹 TOP 10</h3>
+        </div>
+        <ol id="rankingList" class="ranking-list"></ol>
+      </section>
+    </section>
+  </div>
 
   <script src="./game.js"></script>
 </body>

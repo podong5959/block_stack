@@ -80,8 +80,16 @@ const SCORE_TABLE = {
 
 const BEST_SCORE_KEY = "block-stack-best-score-v1";
 const GAMES_SINCE_ALL_CLEAR_KEY = "block-stack-games-since-all-clear-v1";
+const PLAYER_ID_KEY = "block-stack-player-id-v1";
+const LEADERBOARD_KEY = "block-stack-leaderboard-v1";
+const AUDIO_ENABLED_KEY = "block-stack-audio-enabled-v1";
+const BGM_ENABLED_KEY = "block-stack-bgm-enabled-v1";
+const LOGIN_INFO_KEY = "block-stack-login-info-v1";
 const ALL_CLEAR_GUARANTEE_GAP = 5;
 const BASE_TURN_COUNT = 15;
+const LEADERBOARD_LIMIT = 10;
+const PLAYER_ID_MIN_LENGTH = 2;
+const PLAYER_ID_MAX_LENGTH = 16;
 const ALL_CLEAR_BONUS_BASE = 1400;
 const ALL_CLEAR_BONUS_GUARANTEE = 1000;
 const CHAIN_STEP_DELAY_MS = 110;
@@ -98,11 +106,15 @@ const LOW_TURN_WARNING_THRESHOLD = 5;
 const BOARD_COLOR_FLASH_MIN_POPS = 15;
 const BOARD_COLOR_FLASH_MS = 360;
 const SCREEN_COLOR_FLASH_MS = 170;
+const SOUND_GAIN_MULTIPLIER = 1.3;
+const BGM_GAIN_MULTIPLIER = 4;
 
 const elements = {
   scoreValue: document.getElementById("scoreValue"),
   bestScoreValue: document.getElementById("bestScoreValue"),
   collapseValue: document.getElementById("collapseValue"),
+  rankingButton: document.getElementById("rankingButton"),
+  settingsButton: document.getElementById("settingsButton"),
   collapseWrap: document.querySelector(".collapse-wrap"),
   collapseBar: document.getElementById("collapseBar"),
   board: document.getElementById("board"),
@@ -116,13 +128,45 @@ const elements = {
   endingScoreValue: document.getElementById("endingScoreValue"),
   endingContinueButton: document.getElementById("endingContinueButton"),
   endingNewGameButton: document.getElementById("endingNewGameButton"),
+  settingsModal: document.getElementById("settingsModal"),
+  settingsBackdrop: document.getElementById("settingsBackdrop"),
+  settingsCloseButton: document.getElementById("settingsCloseButton"),
+  soundSwitchButton: document.getElementById("soundSwitchButton"),
+  soundSwitchState: document.getElementById("soundSwitchState"),
+  bgmSwitchButton: document.getElementById("bgmSwitchButton"),
+  bgmSwitchState: document.getElementById("bgmSwitchState"),
+  profileButton: document.getElementById("profileButton"),
+  profilePanel: document.getElementById("profilePanel"),
+  playerIdInput: document.getElementById("playerIdInput"),
+  editPlayerIdButton: document.getElementById("editPlayerIdButton"),
+  savePlayerIdButton: document.getElementById("savePlayerIdButton"),
+  loginInfoValue: document.getElementById("loginInfoValue"),
+  linkAccountButton: document.getElementById("linkAccountButton"),
+  accountProvidersInfo: document.getElementById("accountProvidersInfo"),
+  rankingList: document.getElementById("rankingList"),
+  rankingModal: document.getElementById("rankingModal"),
+  rankingBackdrop: document.getElementById("rankingBackdrop"),
+  rankingCloseButton: document.getElementById("rankingCloseButton"),
+  myRankTabButton: document.getElementById("myRankTabButton"),
+  top10TabButton: document.getElementById("top10TabButton"),
+  myRankView: document.getElementById("myRankView"),
+  top10View: document.getElementById("top10View"),
+  myRankPlayerValue: document.getElementById("myRankPlayerValue"),
+  myRankScoreValue: document.getElementById("myRankScoreValue"),
+  myRankPositionValue: document.getElementById("myRankPositionValue"),
+  settingsNotice: document.getElementById("settingsNotice"),
 };
 
 const audioState = {
   ctx: null,
-  enabled: true,
+  enabled: getAudioEnabled(),
+  bgmEnabled: getBgmEnabled(),
   lastVoiceAt: 0,
+  bgmTimerId: null,
+  bgmStep: 0,
 };
+
+const initialPlayerId = getPlayerId();
 
 const state = {
   board: createBoard(),
@@ -154,6 +198,17 @@ const state = {
   allClearGuaranteeActive: false,
   allClearAwardedThisRun: false,
   isResolving: false,
+  settingsOpen: false,
+  rankingOpen: false,
+  playerId: initialPlayerId,
+  runPlayerId: initialPlayerId,
+  loginInfo: getLoginInfo(),
+  profileOpen: false,
+  profileEditing: false,
+  accountInfoOpen: false,
+  rankingView: "mine",
+  leaderboard: getLeaderboard(),
+  rankingSavedThisGame: false,
   boardFlashTimeoutId: null,
   screenFlashTimeoutId: null,
   message: "현재 블록을 드래그해서 보드에 놓으세요.",
@@ -208,6 +263,423 @@ function setBestScore(score) {
   localStorage.setItem(BEST_SCORE_KEY, String(score));
 }
 
+function getAudioEnabled() {
+  const saved = localStorage.getItem(AUDIO_ENABLED_KEY);
+  return saved !== "0";
+}
+
+function setAudioEnabled(enabled) {
+  localStorage.setItem(AUDIO_ENABLED_KEY, enabled ? "1" : "0");
+}
+
+function getBgmEnabled() {
+  const saved = localStorage.getItem(BGM_ENABLED_KEY);
+  return saved !== "0";
+}
+
+function setBgmEnabled(enabled) {
+  localStorage.setItem(BGM_ENABLED_KEY, enabled ? "1" : "0");
+}
+
+function getLoginInfo() {
+  const saved = String(localStorage.getItem(LOGIN_INFO_KEY) || "").trim();
+  return saved || "게스트";
+}
+
+function setLoginInfo(info) {
+  localStorage.setItem(LOGIN_INFO_KEY, info);
+}
+
+function normalizePlayerId(value) {
+  const compact = String(value || "").trim().replace(/\s+/g, " ");
+  const safe = compact.replace(/[^0-9A-Za-z가-힣 _-]/g, "");
+  return safe.slice(0, PLAYER_ID_MAX_LENGTH).trim();
+}
+
+function makeGuestId() {
+  return `게스트${String(Date.now() % 10000).padStart(4, "0")}`;
+}
+
+function getPlayerId() {
+  const saved = normalizePlayerId(localStorage.getItem(PLAYER_ID_KEY));
+  if (saved.length >= PLAYER_ID_MIN_LENGTH) return saved;
+  const generated = makeGuestId();
+  localStorage.setItem(PLAYER_ID_KEY, generated);
+  return generated;
+}
+
+function setPlayerId(playerId) {
+  localStorage.setItem(PLAYER_ID_KEY, playerId);
+}
+
+function sortLeaderboard(entries) {
+  return entries.slice().sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    const aAt = Date.parse(a.at) || 0;
+    const bAt = Date.parse(b.at) || 0;
+    return aAt - bAt;
+  });
+}
+
+function getLeaderboard() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(LEADERBOARD_KEY) || "[]");
+    if (!Array.isArray(raw)) return [];
+    const parsed = [];
+    for (const entry of raw) {
+      const playerId = normalizePlayerId(entry?.playerId);
+      const score = Number(entry?.score);
+      if (playerId.length < PLAYER_ID_MIN_LENGTH) continue;
+      if (!Number.isFinite(score) || score <= 0) continue;
+      parsed.push({
+        playerId,
+        score: Math.floor(score),
+        at: typeof entry?.at === "string" ? entry.at : new Date().toISOString(),
+      });
+    }
+    return sortLeaderboard(parsed).slice(0, LEADERBOARD_LIMIT);
+  } catch (_error) {
+    return [];
+  }
+}
+
+function setLeaderboard(entries) {
+  localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(entries));
+}
+
+function addScoreToLeaderboard(playerId, score) {
+  if (!Number.isFinite(score) || score <= 0) return;
+  const entry = {
+    playerId,
+    score: Math.floor(score),
+    at: new Date().toISOString(),
+  };
+  state.leaderboard = sortLeaderboard([entry, ...state.leaderboard]).slice(0, LEADERBOARD_LIMIT);
+  setLeaderboard(state.leaderboard);
+}
+
+function formatRankingDate(isoString) {
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("ko-KR", { month: "2-digit", day: "2-digit" });
+}
+
+function setSettingsNotice(message = "", type = "") {
+  if (!elements.settingsNotice) return;
+  elements.settingsNotice.textContent = message;
+  elements.settingsNotice.classList.remove("error", "success");
+  if (type) {
+    elements.settingsNotice.classList.add(type);
+  }
+}
+
+function getBestByPlayerEntries(sourceEntries = state.leaderboard) {
+  const bestByPlayer = new Map();
+  for (const entry of sourceEntries) {
+    const prev = bestByPlayer.get(entry.playerId);
+    const entryAt = Date.parse(entry.at) || 0;
+    const prevAt = Date.parse(prev?.at) || 0;
+    if (!prev || entry.score > prev.score || (entry.score === prev.score && entryAt < prevAt)) {
+      bestByPlayer.set(entry.playerId, {
+        playerId: entry.playerId,
+        score: entry.score,
+        at: entry.at,
+      });
+    }
+  }
+  return sortLeaderboard(Array.from(bestByPlayer.values()));
+}
+
+function getBestRankingEntriesWithCurrentPlayer() {
+  const entries = getBestByPlayerEntries();
+  const currentIndex = entries.findIndex((entry) => entry.playerId === state.runPlayerId);
+  const savedBest = currentIndex >= 0 ? entries[currentIndex].score : 0;
+  const liveBest = Math.max(savedBest, Math.floor(Math.max(0, state.score)));
+  if (liveBest <= 0) return entries;
+
+  const next = entries.filter((entry) => entry.playerId !== state.runPlayerId);
+  next.push({
+    playerId: state.runPlayerId,
+    score: liveBest,
+    at: new Date().toISOString(),
+    temp: liveBest > savedBest,
+  });
+  return sortLeaderboard(next);
+}
+
+function getCurrentRankInfo() {
+  const entries = getBestRankingEntriesWithCurrentPlayer();
+  if (entries.length === 0) {
+    return {
+      playerId: state.runPlayerId,
+      score: 0,
+      position: null,
+      total: 0,
+    };
+  }
+
+  const mine = entries.findIndex((entry) => entry.playerId === state.runPlayerId);
+  const myScore = mine >= 0 ? entries[mine].score : 0;
+  return {
+    playerId: state.runPlayerId,
+    score: myScore,
+    position: mine >= 0 ? mine + 1 : null,
+    total: entries.length,
+  };
+}
+
+function renderRankingList() {
+  if (!elements.rankingList) return;
+  elements.rankingList.innerHTML = "";
+  const entries = getBestRankingEntriesWithCurrentPlayer().slice(0, LEADERBOARD_LIMIT);
+
+  if (entries.length === 0) {
+    const empty = document.createElement("li");
+    empty.className = "ranking-empty";
+    empty.textContent = "아직 등록된 기록이 없습니다.";
+    elements.rankingList.appendChild(empty);
+    return;
+  }
+
+  for (const entry of entries) {
+    const row = document.createElement("li");
+
+    const player = document.createElement("span");
+    player.className = "rank-player";
+    player.textContent = entry.temp ? `${entry.playerId} (갱신됨)` : entry.playerId;
+
+    const meta = document.createElement("span");
+    meta.className = "rank-meta";
+
+    const score = document.createElement("span");
+    score.className = "rank-score";
+    score.textContent = String(entry.score);
+
+    const date = document.createElement("span");
+    date.className = "rank-date";
+    date.textContent = entry.temp ? "방금" : formatRankingDate(entry.at);
+
+    meta.appendChild(score);
+    meta.appendChild(date);
+    row.appendChild(player);
+    row.appendChild(meta);
+    elements.rankingList.appendChild(row);
+  }
+}
+
+function renderMyRankView() {
+  const rank = getCurrentRankInfo();
+  if (elements.myRankPlayerValue) {
+    elements.myRankPlayerValue.textContent = rank.playerId;
+  }
+  if (elements.myRankScoreValue) {
+    elements.myRankScoreValue.textContent = String(rank.score);
+  }
+  if (elements.myRankPositionValue) {
+    elements.myRankPositionValue.textContent = rank.position
+      ? `${rank.position}위 / ${rank.total}명`
+      : "기록 없음";
+  }
+}
+
+function updateModalBodyLock() {
+  document.body.classList.toggle("settings-open", state.settingsOpen || state.rankingOpen);
+}
+
+function renderSwitchButton(button, stateEl, enabled) {
+  if (!button || !stateEl) return;
+  button.classList.toggle("on", enabled);
+  button.classList.toggle("off", !enabled);
+  button.setAttribute("aria-pressed", enabled ? "true" : "false");
+  stateEl.textContent = enabled ? "ON" : "OFF";
+}
+
+function renderProfileState() {
+  if (elements.profilePanel) {
+    elements.profilePanel.classList.toggle("hidden", !state.profileOpen);
+  }
+  if (elements.playerIdInput) {
+    if (!state.profileEditing) {
+      elements.playerIdInput.value = state.playerId;
+    }
+    elements.playerIdInput.readOnly = !state.profileEditing;
+  }
+  if (elements.savePlayerIdButton) {
+    elements.savePlayerIdButton.classList.toggle("hidden", !state.profileEditing);
+  }
+  if (elements.accountProvidersInfo) {
+    elements.accountProvidersInfo.classList.toggle("hidden", !state.accountInfoOpen);
+  }
+}
+
+function renderRankingViewState() {
+  const mine = state.rankingView === "mine";
+  if (elements.myRankTabButton) {
+    elements.myRankTabButton.classList.toggle("active", mine);
+  }
+  if (elements.top10TabButton) {
+    elements.top10TabButton.classList.toggle("active", !mine);
+  }
+  if (elements.myRankView) {
+    elements.myRankView.classList.toggle("hidden", !mine);
+  }
+  if (elements.top10View) {
+    elements.top10View.classList.toggle("hidden", mine);
+  }
+}
+
+function syncSettingsFields() {
+  renderSwitchButton(elements.soundSwitchButton, elements.soundSwitchState, audioState.enabled);
+  renderSwitchButton(elements.bgmSwitchButton, elements.bgmSwitchState, audioState.bgmEnabled);
+  if (elements.loginInfoValue) {
+    elements.loginInfoValue.textContent = state.loginInfo;
+  }
+  renderProfileState();
+}
+
+function syncRankingFields() {
+  renderRankingList();
+  renderMyRankView();
+  renderRankingViewState();
+}
+
+function closeSettingsModal() {
+  if (!state.settingsOpen || !elements.settingsModal) return;
+  state.settingsOpen = false;
+  state.profileOpen = false;
+  state.profileEditing = false;
+  state.accountInfoOpen = false;
+  elements.settingsModal.classList.add("hidden");
+  updateModalBodyLock();
+}
+
+function openSettingsModal() {
+  if (state.settingsOpen || !elements.settingsModal) return;
+  closeRankingModal();
+  endDragInteraction();
+  state.settingsOpen = true;
+  state.profileOpen = false;
+  state.profileEditing = false;
+  state.accountInfoOpen = false;
+  elements.settingsModal.classList.remove("hidden");
+  updateModalBodyLock();
+  setSettingsNotice("");
+  syncSettingsFields();
+}
+
+function closeRankingModal() {
+  if (!state.rankingOpen || !elements.rankingModal) return;
+  state.rankingOpen = false;
+  elements.rankingModal.classList.add("hidden");
+  updateModalBodyLock();
+}
+
+function openRankingModal() {
+  if (state.rankingOpen || !elements.rankingModal) return;
+  closeSettingsModal();
+  state.rankingOpen = true;
+  state.rankingView = "mine";
+  elements.rankingModal.classList.remove("hidden");
+  updateModalBodyLock();
+  syncRankingFields();
+}
+
+function setRankingView(view) {
+  state.rankingView = view === "top10" ? "top10" : "mine";
+  syncRankingFields();
+}
+
+function toggleProfilePanel() {
+  state.profileOpen = !state.profileOpen;
+  if (!state.profileOpen) {
+    state.profileEditing = false;
+    state.accountInfoOpen = false;
+  }
+  setSettingsNotice("");
+  syncSettingsFields();
+}
+
+function setProfileEditing(editing) {
+  state.profileEditing = editing;
+  renderProfileState();
+  if (editing && elements.playerIdInput) {
+    elements.playerIdInput.focus();
+    elements.playerIdInput.select();
+  }
+}
+
+function enablePlayerIdEdit() {
+  if (!state.profileOpen) {
+    state.profileOpen = true;
+    syncSettingsFields();
+  }
+  setProfileEditing(true);
+}
+
+function savePlayerIdFromInput() {
+  if (!state.profileEditing) return;
+  const next = normalizePlayerId(elements.playerIdInput?.value || "");
+  if (next.length < PLAYER_ID_MIN_LENGTH) {
+    setSettingsNotice("아이디는 2자 이상으로 입력해 주세요.", "error");
+    return;
+  }
+  state.playerId = next;
+  setPlayerId(next);
+  setProfileEditing(false);
+  syncSettingsFields();
+  setSettingsNotice("아이디를 저장했습니다.", "success");
+}
+
+function toggleAccountProvidersInfo() {
+  state.accountInfoOpen = !state.accountInfoOpen;
+  syncSettingsFields();
+}
+
+function toggleSoundEnabled() {
+  audioState.enabled = !audioState.enabled;
+  setAudioEnabled(audioState.enabled);
+  if (audioState.enabled) {
+    ensureAudioContext({ force: true });
+  }
+  if (!audioState.enabled && !audioState.bgmEnabled && audioState.ctx && audioState.ctx.state !== "closed") {
+    audioState.ctx.suspend().catch(() => {
+      // Ignore suspend failures.
+    });
+  }
+  syncSettingsFields();
+}
+
+function toggleBgmEnabled() {
+  audioState.bgmEnabled = !audioState.bgmEnabled;
+  setBgmEnabled(audioState.bgmEnabled);
+  if (audioState.bgmEnabled) {
+    ensureAudioContext({ force: true });
+  }
+  syncBgmPlayback();
+  syncSettingsFields();
+}
+
+function clearLeaderboardRecords() {
+  const confirmed = window.confirm("랭킹 기록을 모두 삭제할까요?");
+  if (!confirmed) return;
+  state.leaderboard = [];
+  setLeaderboard(state.leaderboard);
+  renderRankingList();
+  setSettingsNotice("랭킹을 초기화했습니다.", "success");
+}
+
+function commitRankingIfNeeded() {
+  if (state.rankingSavedThisGame) return;
+  if (!state.gameOver) return;
+  if (!Number.isFinite(state.score) || state.score <= 0) {
+    state.rankingSavedThisGame = true;
+    return;
+  }
+  addScoreToLeaderboard(state.runPlayerId, state.score);
+  state.rankingSavedThisGame = true;
+  syncRankingFields();
+}
+
 function topColor(cell) {
   return cell.stack.length > 0 ? cell.stack[cell.stack.length - 1] : null;
 }
@@ -217,10 +689,12 @@ function clampCollapse(value) {
   return Math.max(0, Math.floor(value));
 }
 
-function ensureAudioContext() {
-  if (!audioState.enabled) return null;
+function ensureAudioContext(options = {}) {
+  const { force = false } = options;
+  if (!force && !audioState.enabled) return null;
   if (!window.AudioContext && !window.webkitAudioContext) {
     audioState.enabled = false;
+    audioState.bgmEnabled = false;
     return null;
   }
   if (!audioState.ctx) {
@@ -243,20 +717,75 @@ function playTone(ctx, {
   type = "triangle",
   gain = 0.04,
 } = {}) {
+  // Prevent queued bursts while AudioContext is suspended by autoplay policy.
+  if (!ctx || ctx.state !== "running") return;
   const osc = ctx.createOscillator();
   const amp = ctx.createGain();
+  const finalGain = Math.min(0.25, Math.max(0.0001, gain * SOUND_GAIN_MULTIPLIER));
   osc.type = type;
   osc.frequency.value = frequency;
   if (Number.isFinite(frequencyEnd)) {
     osc.frequency.exponentialRampToValueAtTime(Math.max(20, frequencyEnd), start + duration);
   }
   amp.gain.setValueAtTime(0.0001, start);
-  amp.gain.exponentialRampToValueAtTime(gain, start + 0.01);
+  amp.gain.exponentialRampToValueAtTime(finalGain, start + 0.01);
   amp.gain.exponentialRampToValueAtTime(0.0001, start + duration);
   osc.connect(amp);
   amp.connect(ctx.destination);
   osc.start(start);
   osc.stop(start + duration + 0.02);
+}
+
+function playBgmStep() {
+  if (!audioState.bgmEnabled) return;
+  const ctx = ensureAudioContext({ force: true });
+  if (!ctx || ctx.state !== "running") return;
+  const melody = [262, 294, 330, 392, 349, 330, 294, 262];
+  const bass = [131, 147, 165, 196, 175, 165, 147, 131];
+  const step = audioState.bgmStep % melody.length;
+  const now = ctx.currentTime + 0.01;
+  playTone(ctx, {
+    frequency: melody[step],
+    duration: 0.22,
+    start: now,
+    type: "triangle",
+    gain: 0.018 * BGM_GAIN_MULTIPLIER,
+  });
+  playTone(ctx, {
+    frequency: bass[step],
+    duration: 0.24,
+    start: now,
+    type: "sine",
+    gain: 0.013 * BGM_GAIN_MULTIPLIER,
+  });
+  audioState.bgmStep += 1;
+}
+
+function startBgmLoop() {
+  if (!audioState.bgmEnabled) return;
+  if (audioState.bgmTimerId !== null) return;
+  audioState.bgmStep = 0;
+  playBgmStep();
+  audioState.bgmTimerId = window.setInterval(playBgmStep, 290);
+}
+
+function stopBgmLoop() {
+  if (audioState.bgmTimerId === null) return;
+  window.clearInterval(audioState.bgmTimerId);
+  audioState.bgmTimerId = null;
+}
+
+function syncBgmPlayback() {
+  if (audioState.bgmEnabled) {
+    startBgmLoop();
+  } else {
+    stopBgmLoop();
+  }
+  if (!audioState.enabled && !audioState.bgmEnabled && audioState.ctx && audioState.ctx.state !== "closed") {
+    audioState.ctx.suspend().catch(() => {
+      // Ignore suspend failures.
+    });
+  }
 }
 
 function playPlacementSound() {
@@ -1467,6 +1996,9 @@ function setGameOver(reason) {
   endDragInteraction();
   state.gameOver = true;
   state.message = reason;
+  if (state.continueUsedThisGame) {
+    commitRankingIfNeeded();
+  }
   startEndingSequence(reason);
 }
 
@@ -2090,6 +2622,19 @@ function onDragCancel(event) {
   render();
 }
 
+function onWindowKeyDown(event) {
+  if (event.key !== "Escape") return;
+  if (state.rankingOpen) {
+    event.preventDefault();
+    closeRankingModal();
+    return;
+  }
+  if (state.settingsOpen) {
+    event.preventDefault();
+    closeSettingsModal();
+  }
+}
+
 function render() {
   elements.scoreValue.textContent = String(state.score);
   elements.bestScoreValue.textContent = String(state.bestScore);
@@ -2111,9 +2656,13 @@ function render() {
   renderCollapseBar();
   renderBoard();
   renderBlockView(elements.currentBlockView, state.currentBlock, { draggable: true });
+  if (state.rankingOpen) {
+    syncRankingFields();
+  }
 }
 
 function resetGame() {
+  commitRankingIfNeeded();
   endDragInteraction();
   clearAmbientTheme();
   if (state.screenFlashTimeoutId) {
@@ -2141,10 +2690,12 @@ function resetGame() {
   state.clearStreakTurns = 0;
   state.continueUsedThisGame = false;
   state.runStartBest = state.bestScore;
+  state.runPlayerId = state.playerId;
   state.turnsPlayed = 0;
   state.freeSkipUsed = false;
   state.hoverCell = null;
   state.gameOver = false;
+  state.rankingSavedThisGame = false;
   state.endingSequenceRunning = false;
   state.message = state.allClearGuaranteeActive
     ? "이번 판은 올클리어 달성 시 보너스 강화 모드입니다."
@@ -2157,8 +2708,32 @@ elements.skipButton.addEventListener("click", runSkip);
 elements.endingContinueButton.addEventListener("click", runEndingContinue);
 elements.endingNewGameButton.addEventListener("click", resetGame);
 elements.currentBlockView.addEventListener("pointerdown", onDragStart);
+elements.rankingButton.addEventListener("click", openRankingModal);
+elements.settingsButton.addEventListener("click", openSettingsModal);
+elements.settingsCloseButton.addEventListener("click", closeSettingsModal);
+elements.settingsBackdrop.addEventListener("click", closeSettingsModal);
+elements.soundSwitchButton.addEventListener("click", toggleSoundEnabled);
+elements.bgmSwitchButton.addEventListener("click", toggleBgmEnabled);
+elements.profileButton.addEventListener("click", toggleProfilePanel);
+elements.editPlayerIdButton.addEventListener("click", enablePlayerIdEdit);
+elements.savePlayerIdButton.addEventListener("click", savePlayerIdFromInput);
+elements.linkAccountButton.addEventListener("click", toggleAccountProvidersInfo);
+elements.playerIdInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    savePlayerIdFromInput();
+  }
+});
+elements.rankingCloseButton.addEventListener("click", closeRankingModal);
+elements.rankingBackdrop.addEventListener("click", closeRankingModal);
+elements.myRankTabButton.addEventListener("click", () => setRankingView("mine"));
+elements.top10TabButton.addEventListener("click", () => setRankingView("top10"));
 window.addEventListener("pointermove", onDragMove);
 window.addEventListener("pointerup", onDragEnd);
 window.addEventListener("pointercancel", onDragCancel);
+window.addEventListener("keydown", onWindowKeyDown);
 
+syncSettingsFields();
+syncRankingFields();
+syncBgmPlayback();
 resetGame();

@@ -109,8 +109,6 @@ const SCREEN_COLOR_FLASH_MS = 170;
 const SOUND_GAIN_MULTIPLIER = 1.3;
 const BGM_GAIN_MULTIPLIER = 4;
 const SKIP_REROLL_MAX_ATTEMPTS = 12;
-const SKIP_PENALTY_TO_TURN_DIVISOR = 6;
-const SKIP_EXTRA_COST_CAP = 4;
 
 const elements = {
   scoreValue: document.getElementById("scoreValue"),
@@ -179,7 +177,6 @@ const state = {
   collapse: BASE_TURN_COUNT,
   currentBlock: null,
   freeSkipUsed: false,
-  paidSkipCount: 0,
   noClearStreak: 0,
   clearStreakTurns: 0,
   continueUsedThisGame: false,
@@ -2027,13 +2024,6 @@ function nextTurnBlock() {
   state.currentBlock = generateBlock();
 }
 
-function getPaidSkipCost() {
-  const difficulty = getDifficulty(state.score);
-  const baseCost = Math.max(1, Math.round(difficulty.skipPenalty / SKIP_PENALTY_TO_TURN_DIVISOR));
-  const extraCost = Math.min(SKIP_EXTRA_COST_CAP, state.paidSkipCount);
-  return baseCost + extraCost;
-}
-
 function drawSkipBlock(maxAttempts = SKIP_REROLL_MAX_ATTEMPTS) {
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     nextTurnBlock();
@@ -2307,23 +2297,11 @@ function runSkip() {
   if (state.gameOver || state.isResolving) return;
   endDragInteraction();
 
-  let skipPrefix = "무료 스킵 사용";
   if (!state.freeSkipUsed) {
     state.freeSkipUsed = true;
   } else {
-    const skipCost = getPaidSkipCost();
-    const confirmed = window.confirm(
-      `광고 스킵 사용 시 남은 횟수 ${skipCost}가 소모됩니다. 진행하시겠습니까?`
-    );
+    const confirmed = window.confirm("광고 시청 후 스킵하시겠습니까?");
     if (!confirmed) return;
-    state.paidSkipCount += 1;
-    state.collapse = clampCollapse(state.collapse - skipCost);
-    skipPrefix = `광고 스킵 사용 (-${skipCost})`;
-    if (state.collapse <= 0) {
-      setGameOver(`광고 스킵 비용(${skipCost})으로 남은 횟수가 모두 소진되었습니다.`);
-      render();
-      return;
-    }
   }
 
   const drawAttempts = drawSkipBlock();
@@ -2333,8 +2311,6 @@ function runSkip() {
   } else {
     state.clearStreakTurns = 0;
     state.noClearStreak = 0;
-    const rerollMessage = drawAttempts > 1 ? ` (${drawAttempts}회 재추첨)` : "";
-    state.message = `${skipPrefix}${rerollMessage}. 새 블록을 드래그해 배치하세요.`;
   }
 
   render();
@@ -2696,15 +2672,9 @@ function render() {
     elements.endingScoreValue.textContent = String(state.score);
   }
   elements.message.textContent = state.message;
-  const paidSkipCost = state.freeSkipUsed ? getPaidSkipCost() : 0;
-  elements.skipButton.textContent = state.freeSkipUsed
-    ? `스킵 (광고 · -${paidSkipCost}턴)`
-    : "스킵 (무료 1회)";
-  elements.skipButton.classList.toggle("is-paid", state.freeSkipUsed);
-  elements.skipButton.classList.toggle(
-    "is-risky",
-    state.freeSkipUsed && state.collapse <= paidSkipCost
-  );
+  elements.skipButton.textContent = "SKIP";
+  elements.skipButton.classList.toggle("needs-ad", state.freeSkipUsed);
+  elements.skipButton.classList.remove("is-paid", "is-risky");
   elements.skipButton.disabled = state.gameOver || state.isResolving;
   if (elements.endingContinueButton) {
     elements.endingContinueButton.disabled = state.endingSequenceRunning;
@@ -2750,7 +2720,6 @@ function resetGame() {
   state.noClearStreak = 0;
   state.clearStreakTurns = 0;
   state.continueUsedThisGame = false;
-  state.paidSkipCount = 0;
   state.runStartBest = state.bestScore;
   state.runPlayerId = state.playerId;
   state.turnsPlayed = 0;

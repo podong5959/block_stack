@@ -109,6 +109,8 @@ const SCREEN_COLOR_FLASH_MS = 170;
 const SOUND_GAIN_MULTIPLIER = 1.3;
 const BGM_GAIN_MULTIPLIER = 4;
 const SKIP_REROLL_MAX_ATTEMPTS = 12;
+const AD_SKELETON_WATCH_MS = 2100;
+const AD_SKELETON_STEP_MS = 90;
 
 const elements = {
   scoreValue: document.getElementById("scoreValue"),
@@ -156,6 +158,9 @@ const elements = {
   myRankScoreValue: document.getElementById("myRankScoreValue"),
   myRankPositionValue: document.getElementById("myRankPositionValue"),
   settingsNotice: document.getElementById("settingsNotice"),
+  adWatchModal: document.getElementById("adWatchModal"),
+  adWatchStatus: document.getElementById("adWatchStatus"),
+  adWatchProgressFill: document.getElementById("adWatchProgressFill"),
 };
 
 const audioState = {
@@ -207,6 +212,7 @@ const state = {
   profileOpen: false,
   profileEditing: false,
   accountInfoOpen: false,
+  isAdWatching: false,
   rankingView: "mine",
   leaderboard: getLeaderboard(),
   rankingSavedThisGame: false,
@@ -484,7 +490,7 @@ function renderMyRankView() {
 }
 
 function updateModalBodyLock() {
-  document.body.classList.toggle("settings-open", state.settingsOpen || state.rankingOpen);
+  document.body.classList.toggle("settings-open", state.settingsOpen || state.rankingOpen || state.isAdWatching);
 }
 
 function renderSwitchButton(button, stateEl, enabled) {
@@ -555,7 +561,7 @@ function closeSettingsModal() {
 }
 
 function openSettingsModal() {
-  if (state.settingsOpen || !elements.settingsModal) return;
+  if (state.settingsOpen || state.isAdWatching || !elements.settingsModal) return;
   closeRankingModal();
   endDragInteraction();
   state.settingsOpen = true;
@@ -576,7 +582,7 @@ function closeRankingModal() {
 }
 
 function openRankingModal() {
-  if (state.rankingOpen || !elements.rankingModal) return;
+  if (state.rankingOpen || state.isAdWatching || !elements.rankingModal) return;
   closeSettingsModal();
   state.rankingOpen = true;
   state.rankingView = "mine";
@@ -2034,6 +2040,51 @@ function drawSkipBlock(maxAttempts = SKIP_REROLL_MAX_ATTEMPTS) {
   return 0;
 }
 
+function closeAdWatchModal() {
+  state.isAdWatching = false;
+  if (elements.adWatchModal) {
+    elements.adWatchModal.classList.add("hidden");
+  }
+  if (elements.adWatchStatus) {
+    elements.adWatchStatus.textContent = "광고를 불러오고 있습니다...";
+  }
+  if (elements.adWatchProgressFill) {
+    elements.adWatchProgressFill.style.transform = "scaleX(0)";
+  }
+  updateModalBodyLock();
+}
+
+async function watchSkipAdSkeleton() {
+  if (!elements.adWatchModal || !elements.adWatchStatus || !elements.adWatchProgressFill) {
+    await wait(AD_SKELETON_WATCH_MS);
+    return true;
+  }
+
+  endDragInteraction();
+  state.isAdWatching = true;
+  elements.adWatchModal.classList.remove("hidden");
+  updateModalBodyLock();
+  render();
+
+  const steps = Math.max(1, Math.ceil(AD_SKELETON_WATCH_MS / AD_SKELETON_STEP_MS));
+  for (let i = 1; i <= steps; i += 1) {
+    await wait(AD_SKELETON_STEP_MS);
+    if (!state.isAdWatching) return false;
+    const progress = Math.min(1, i / steps);
+    const remainMs = Math.max(0, AD_SKELETON_WATCH_MS - i * AD_SKELETON_STEP_MS);
+    const remainSec = Math.max(1, Math.ceil(remainMs / 1000));
+    elements.adWatchProgressFill.style.transform = `scaleX(${progress.toFixed(3)})`;
+    elements.adWatchStatus.textContent = progress >= 1
+      ? "광고 시청 완료"
+      : `광고 재생 중... ${remainSec}초`;
+  }
+
+  await wait(220);
+  closeAdWatchModal();
+  render();
+  return true;
+}
+
 function updateBestScore() {
   if (state.score > state.bestScore) {
     state.bestScore = state.score;
@@ -2042,7 +2093,7 @@ function updateBestScore() {
 }
 
 async function runPlacement(anchorX, anchorY) {
-  if (state.gameOver || !state.currentBlock || state.isResolving) return;
+  if (state.gameOver || !state.currentBlock || state.isResolving || state.isAdWatching) return;
   const difficulty = getDifficulty(state.score);
   state.turnsPlayed += 1;
 
@@ -2293,15 +2344,15 @@ async function runPlacement(anchorX, anchorY) {
   }
 }
 
-function runSkip() {
-  if (state.gameOver || state.isResolving) return;
+async function runSkip() {
+  if (state.gameOver || state.isResolving || state.isAdWatching) return;
   endDragInteraction();
 
   if (!state.freeSkipUsed) {
     state.freeSkipUsed = true;
   } else {
-    const confirmed = window.confirm("광고 시청 후 스킵하시겠습니까?");
-    if (!confirmed) return;
+    const watched = await watchSkipAdSkeleton();
+    if (!watched) return;
   }
 
   const drawAttempts = drawSkipBlock();
@@ -2559,7 +2610,7 @@ function findNearestFilledMiniCell(clientX, clientY) {
 }
 
 function onDragStart(event) {
-  if (state.gameOver || state.isResolving || !state.currentBlock) return;
+  if (state.gameOver || state.isResolving || state.isAdWatching || !state.currentBlock) return;
   if (state.isDragging) return;
   if (event.pointerType === "mouse" && event.button !== 0) return;
   let grabbedCell = event.target.closest(".mini-cell.fill");
@@ -2650,6 +2701,10 @@ function onDragCancel(event) {
 
 function onWindowKeyDown(event) {
   if (event.key !== "Escape") return;
+  if (state.isAdWatching) {
+    event.preventDefault();
+    return;
+  }
   if (state.rankingOpen) {
     event.preventDefault();
     closeRankingModal();
@@ -2675,7 +2730,7 @@ function render() {
   elements.skipButton.textContent = "SKIP";
   elements.skipButton.classList.toggle("needs-ad", state.freeSkipUsed);
   elements.skipButton.classList.remove("is-paid", "is-risky");
-  elements.skipButton.disabled = state.gameOver || state.isResolving;
+  elements.skipButton.disabled = state.gameOver || state.isResolving || state.isAdWatching;
   if (elements.endingContinueButton) {
     elements.endingContinueButton.disabled = state.endingSequenceRunning;
   }
@@ -2695,6 +2750,7 @@ function render() {
 function resetGame() {
   commitRankingIfNeeded();
   endDragInteraction();
+  closeAdWatchModal();
   clearAmbientTheme();
   if (state.screenFlashTimeoutId) {
     window.clearTimeout(state.screenFlashTimeoutId);

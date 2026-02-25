@@ -143,6 +143,23 @@
     </section>
   </div>
 
+  <div id="adWatchModal" class="ad-watch-modal hidden" role="dialog" aria-modal="true" aria-labelledby="adWatchTitle">
+    <div class="settings-backdrop"></div>
+    <section class="ad-watch-panel">
+      <h2 id="adWatchTitle">광고 준비 중</h2>
+      <div class="ad-skeleton-frame" aria-hidden="true">
+        <span class="ad-skeleton-block is-video"></span>
+        <span class="ad-skeleton-block is-title"></span>
+        <span class="ad-skeleton-block is-copy"></span>
+        <span class="ad-skeleton-block is-copy short"></span>
+      </div>
+      <p id="adWatchStatus" class="ad-watch-status">광고를 불러오고 있습니다...</p>
+      <div class="ad-watch-progress" aria-hidden="true">
+        <span id="adWatchProgressFill"></span>
+      </div>
+    </section>
+  </div>
+
   <script src="./game.js"></script>
 </body>
 </html>

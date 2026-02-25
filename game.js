@@ -108,6 +108,9 @@ const BOARD_COLOR_FLASH_MS = 360;
 const SCREEN_COLOR_FLASH_MS = 170;
 const SOUND_GAIN_MULTIPLIER = 1.3;
 const BGM_GAIN_MULTIPLIER = 4;
+const SKIP_REROLL_MAX_ATTEMPTS = 12;
+const SKIP_PENALTY_TO_TURN_DIVISOR = 6;
+const SKIP_EXTRA_COST_CAP = 4;
 
 const elements = {
   scoreValue: document.getElementById("scoreValue"),
@@ -176,6 +179,7 @@ const state = {
   collapse: BASE_TURN_COUNT,
   currentBlock: null,
   freeSkipUsed: false,
+  paidSkipCount: 0,
   noClearStreak: 0,
   clearStreakTurns: 0,
   continueUsedThisGame: false,
@@ -1655,6 +1659,7 @@ function resetEndingLayerVisuals() {
 
 function buildEndingBoardFx() {
   if (!elements.endingBoardFx) return;
+  syncEndingBoardFxBounds();
   elements.endingBoardFx.innerHTML = "";
   const totalCells = BOARD_SIZE * BOARD_SIZE;
   for (let y = 0; y < BOARD_SIZE; y += 1) {
@@ -1670,6 +1675,22 @@ function buildEndingBoardFx() {
       elements.endingBoardFx.appendChild(fxCell);
     }
   }
+}
+
+function syncEndingBoardFxBounds() {
+  if (!elements.endingBoardFx || !elements.gameOverLayer || !elements.board) return;
+  const layerRect = elements.gameOverLayer.getBoundingClientRect();
+  const boardRect = elements.board.getBoundingClientRect();
+  if (layerRect.width <= 0 || layerRect.height <= 0 || boardRect.width <= 0 || boardRect.height <= 0) {
+    return;
+  }
+
+  const offsetX = Math.max(0, boardRect.left - layerRect.left);
+  const offsetY = Math.max(0, boardRect.top - layerRect.top);
+  elements.endingBoardFx.style.setProperty("--ending-fx-left", `${offsetX}px`);
+  elements.endingBoardFx.style.setProperty("--ending-fx-top", `${offsetY}px`);
+  elements.endingBoardFx.style.setProperty("--ending-fx-width", `${boardRect.width}px`);
+  elements.endingBoardFx.style.setProperty("--ending-fx-height", `${boardRect.height}px`);
 }
 
 function spawnEndingFireworks(level = 1) {
@@ -2006,6 +2027,23 @@ function nextTurnBlock() {
   state.currentBlock = generateBlock();
 }
 
+function getPaidSkipCost() {
+  const difficulty = getDifficulty(state.score);
+  const baseCost = Math.max(1, Math.round(difficulty.skipPenalty / SKIP_PENALTY_TO_TURN_DIVISOR));
+  const extraCost = Math.min(SKIP_EXTRA_COST_CAP, state.paidSkipCount);
+  return baseCost + extraCost;
+}
+
+function drawSkipBlock(maxAttempts = SKIP_REROLL_MAX_ATTEMPTS) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    nextTurnBlock();
+    if (hasAnyPlacement(state.currentBlock)) {
+      return attempt;
+    }
+  }
+  return 0;
+}
+
 function updateBestScore() {
   if (state.score > state.bestScore) {
     state.bestScore = state.score;
@@ -2269,22 +2307,34 @@ function runSkip() {
   if (state.gameOver || state.isResolving) return;
   endDragInteraction();
 
+  let skipPrefix = "무료 스킵 사용";
   if (!state.freeSkipUsed) {
     state.freeSkipUsed = true;
-    state.message = "무료 스킵 사용.";
   } else {
-    const confirmed = window.confirm("광고 시청 후 스킵하시겠습니까?");
+    const skipCost = getPaidSkipCost();
+    const confirmed = window.confirm(
+      `광고 스킵 사용 시 남은 횟수 ${skipCost}가 소모됩니다. 진행하시겠습니까?`
+    );
     if (!confirmed) return;
-    state.message = "광고 스킵 사용.";
+    state.paidSkipCount += 1;
+    state.collapse = clampCollapse(state.collapse - skipCost);
+    skipPrefix = `광고 스킵 사용 (-${skipCost})`;
+    if (state.collapse <= 0) {
+      setGameOver(`광고 스킵 비용(${skipCost})으로 남은 횟수가 모두 소진되었습니다.`);
+      render();
+      return;
+    }
   }
 
-  nextTurnBlock();
+  const drawAttempts = drawSkipBlock();
 
-  if (!hasAnyPlacement(state.currentBlock)) {
-    setGameOver("스킵 이후 배치 가능한 공간이 없습니다.");
+  if (drawAttempts === 0) {
+    setGameOver("스킵 이후에도 배치 가능한 블록이 없습니다.");
   } else {
     state.clearStreakTurns = 0;
-    state.message = `${state.message} 새 블록을 드래그해 배치하세요.`;
+    state.noClearStreak = 0;
+    const rerollMessage = drawAttempts > 1 ? ` (${drawAttempts}회 재추첨)` : "";
+    state.message = `${skipPrefix}${rerollMessage}. 새 블록을 드래그해 배치하세요.`;
   }
 
   render();
@@ -2646,12 +2696,23 @@ function render() {
     elements.endingScoreValue.textContent = String(state.score);
   }
   elements.message.textContent = state.message;
-  elements.skipButton.textContent = state.freeSkipUsed ? "스킵 (광고 필요)" : "스킵 (무료 1회)";
+  const paidSkipCost = state.freeSkipUsed ? getPaidSkipCost() : 0;
+  elements.skipButton.textContent = state.freeSkipUsed
+    ? `스킵 (광고 · -${paidSkipCost}턴)`
+    : "스킵 (무료 1회)";
+  elements.skipButton.classList.toggle("is-paid", state.freeSkipUsed);
+  elements.skipButton.classList.toggle(
+    "is-risky",
+    state.freeSkipUsed && state.collapse <= paidSkipCost
+  );
   elements.skipButton.disabled = state.gameOver || state.isResolving;
   if (elements.endingContinueButton) {
     elements.endingContinueButton.disabled = state.endingSequenceRunning;
   }
   elements.gameOverLayer.classList.toggle("hidden", !state.gameOver);
+  if (state.gameOver) {
+    syncEndingBoardFxBounds();
+  }
 
   renderCollapseBar();
   renderBoard();
@@ -2689,6 +2750,7 @@ function resetGame() {
   state.noClearStreak = 0;
   state.clearStreakTurns = 0;
   state.continueUsedThisGame = false;
+  state.paidSkipCount = 0;
   state.runStartBest = state.bestScore;
   state.runPlayerId = state.playerId;
   state.turnsPlayed = 0;
@@ -2732,6 +2794,11 @@ window.addEventListener("pointermove", onDragMove);
 window.addEventListener("pointerup", onDragEnd);
 window.addEventListener("pointercancel", onDragCancel);
 window.addEventListener("keydown", onWindowKeyDown);
+window.addEventListener("resize", () => {
+  if (state.gameOver) {
+    syncEndingBoardFxBounds();
+  }
+});
 
 syncSettingsFields();
 syncRankingFields();

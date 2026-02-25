@@ -701,6 +701,15 @@ body.settings-open {
   font-size: 12px;
   line-height: 1.2;
   cursor: pointer;
+  transition: transform 120ms ease, filter 120ms ease, background 120ms ease;
+}
+
+.skip-btn.is-paid {
+  background: linear-gradient(90deg, #5c4a2d, #9a5f24);
+}
+
+.skip-btn.is-risky {
+  background: linear-gradient(90deg, #6a2e28, #9f3f2e);
 }
 
 .skip-btn:disabled {
@@ -712,19 +721,24 @@ body.settings-open {
   display: none;
 }
 
-.board-area .game-over-layer {
+.game-over-layer {
   position: absolute;
   inset: 0;
-  border-radius: 14px;
-  background: rgba(24, 16, 8, 0.7);
+  border-radius: inherit;
+  background: rgba(24, 16, 8, 0.64);
   overflow: hidden;
-  backdrop-filter: blur(2px);
+  z-index: 50;
+  backdrop-filter: blur(6px);
 }
 
 .ending-board-fx {
   position: absolute;
-  inset: 0;
+  left: var(--ending-fx-left, 14px);
+  top: var(--ending-fx-top, 14px);
+  width: var(--ending-fx-width, calc(100% - 28px));
+  height: var(--ending-fx-height, calc(100% - 28px));
   padding: 10px;
+  border-radius: 14px;
   display: grid;
   grid-template-columns: repeat(6, 1fr);
   gap: 8px;

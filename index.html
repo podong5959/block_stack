@@ -14,26 +14,31 @@
 </head>
 <body>
   <main class="app-shell">
-    <h1 class="app-title">Block Stack</h1>
     <header class="hud">
-      <div class="hud-top-row">
-        <div class="hud-chip best-chip">
-          <span class="label">BEST</span>
-          <strong id="bestScoreValue">0</strong>
-        </div>
-        <div class="hud-chip score-chip">
-          <span class="label">점수</span>
-          <strong id="scoreValue">0</strong>
+      <div class="hud-title-row">
+        <div class="title-copy">
+          <p class="app-kicker">BEST <strong id="bestScoreValue">0</strong></p>
+          <h1 class="app-title">Block Stack</h1>
         </div>
         <div class="hud-actions">
           <button id="rankingButton" type="button" class="icon-btn trophy-btn" aria-label="랭킹">🏆</button>
           <button id="settingsButton" type="button" class="icon-btn settings-btn" aria-label="설정">&#9881;</button>
         </div>
       </div>
-      <div class="collapse-wrap">
-        <div class="collapse-head">
-          <span>남은횟수</span>
-          <strong id="collapseValue">15</strong>
+      <div class="hud-top-row">
+        <div class="hud-chip last-chip">
+          <span class="label">이전 점수</span>
+          <strong id="lastScoreValue">0</strong>
+        </div>
+        <div class="hud-chip score-chip">
+          <span class="label">점수</span>
+          <strong id="scoreValue">0</strong>
+        </div>
+        <div class="collapse-wrap">
+          <div class="collapse-head">
+            <span>남은 횟수</span>
+            <strong id="collapseValue">15</strong>
+          </div>
         </div>
       </div>
     </header>
@@ -43,11 +48,16 @@
     </section>
 
     <section class="controls">
+      <div class="controls-head">
+        <div class="controls-copy">
+          <span class="controls-kicker">NEXT BLOCK</span>
+          <strong class="controls-title">다음 블럭</strong>
+        </div>
+        <button id="skipButton" type="button" class="skip-btn">SKIP</button>
+      </div>
       <div id="currentBlockView" class="block-view"></div>
-      <button id="skipButton" type="button" class="skip-btn">SKIP</button>
+      <p id="message" class="message">현재 블록을 드래그해서 보드에 놓으세요.</p>
     </section>
-
-    <p id="message" class="message">현재 블록을 드래그해서 보드에 놓으세요.</p>
 
     <div id="gameOverLayer" class="game-over-layer hidden">
       <div id="endingBoardFx" class="ending-board-fx" aria-hidden="true"></div>

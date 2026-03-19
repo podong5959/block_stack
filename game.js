@@ -79,6 +79,7 @@ const SCORE_TABLE = {
 };
 
 const BEST_SCORE_KEY = "block-stack-best-score-v1";
+const LAST_SCORE_KEY = "block-stack-last-score-v1";
 const GAMES_SINCE_ALL_CLEAR_KEY = "block-stack-games-since-all-clear-v1";
 const PLAYER_ID_KEY = "block-stack-player-id-v1";
 const LEADERBOARD_KEY = "block-stack-leaderboard-v1";
@@ -115,6 +116,7 @@ const AD_SKELETON_STEP_MS = 90;
 const elements = {
   scoreValue: document.getElementById("scoreValue"),
   bestScoreValue: document.getElementById("bestScoreValue"),
+  lastScoreValue: document.getElementById("lastScoreValue"),
   collapseValue: document.getElementById("collapseValue"),
   rankingButton: document.getElementById("rankingButton"),
   settingsButton: document.getElementById("settingsButton"),
@@ -179,6 +181,7 @@ const state = {
   boardCellEls: createBoardCellRefs(),
   score: 0,
   bestScore: getBestScore(),
+  lastScore: getLastScore(),
   collapse: BASE_TURN_COUNT,
   currentBlock: null,
   freeSkipUsed: false,
@@ -256,6 +259,11 @@ function getBestScore() {
   return Number.isFinite(saved) && saved > 0 ? saved : 0;
 }
 
+function getLastScore() {
+  const saved = Number(localStorage.getItem(LAST_SCORE_KEY));
+  return Number.isFinite(saved) && saved >= 0 ? Math.floor(saved) : 0;
+}
+
 function getGamesSinceAllClear() {
   const saved = Number(localStorage.getItem(GAMES_SINCE_ALL_CLEAR_KEY));
   return Number.isFinite(saved) && saved >= 0 ? Math.floor(saved) : 0;
@@ -268,6 +276,10 @@ function setGamesSinceAllClear(value) {
 
 function setBestScore(score) {
   localStorage.setItem(BEST_SCORE_KEY, String(score));
+}
+
+function setLastScore(score) {
+  localStorage.setItem(LAST_SCORE_KEY, String(Math.max(0, Math.floor(score))));
 }
 
 function getAudioEnabled() {
@@ -1133,15 +1145,17 @@ function blendRgbWithWhite(channels, amount) {
 function applyAmbientThemeFromRgb(rgbString) {
   const channels = parseRgbTriplet(rgbString);
   if (!channels) return;
-  const top = blendRgbWithWhite(channels, 0.82);
-  const bottom = blendRgbWithWhite(channels, 0.7);
+  const top = blendRgbWithWhite(channels, 0.86);
+  const bottom = blendRgbWithWhite(channels, 0.72);
   document.documentElement.style.setProperty("--bg0", rgbTripletToCss(top));
   document.documentElement.style.setProperty("--bg1", rgbTripletToCss(bottom));
+  document.documentElement.style.setProperty("--ambient-rgb", channels.join(", "));
 }
 
 function clearAmbientTheme() {
   document.documentElement.style.removeProperty("--bg0");
   document.documentElement.style.removeProperty("--bg1");
+  document.documentElement.style.removeProperty("--ambient-rgb");
 }
 
 function triggerScreenColorFlash(rgbString, poppedCells) {
@@ -1938,7 +1952,7 @@ function spawnMegaBurstBanner(poppedCells) {
   if (!elements.board) return;
   const banner = document.createElement("div");
   banner.className = "mega-burst-banner";
-  banner.innerHTML = `<strong>${poppedCells} BURST!</strong><span>쀼루룩 빵빵빵</span>`;
+  banner.innerHTML = `<strong>${poppedCells} BURST!</strong><span>연쇄 폭발</span>`;
   elements.board.appendChild(banner);
   banner.addEventListener("animationend", () => banner.remove(), { once: true });
 }
@@ -2139,7 +2153,7 @@ async function runPlacement(anchorX, anchorY) {
       const linePositions = getLinePositionSet(lines);
       const linkedGroups = collectLinkedCascadeGroups(linePositions);
       const lineBurstColor = getDominantColorFromPositionKeys(linePositions);
-      state.message = depth > 1 ? `${depth}단 연쇄 준비... 둥!` : "둥! 폭발 준비...";
+      state.message = depth > 1 ? `${depth}단 연쇄 준비` : "폭발 준비";
       render();
       markPositionKeysForBlast(linePositions, { depth, linked: false });
       const preBlastDelay = Math.min(PRE_BLAST_MAX_DELAY_MS, PRE_BLAST_DELAY_MS + (depth - 1) * 24);
@@ -2156,7 +2170,7 @@ async function runPlacement(anchorX, anchorY) {
       turnLineCount += lineCount;
       burstCells.push(...removedLineCells);
 
-      state.message = depth > 1 ? `${depth}단 연쇄 뿅!!!!` : `${lineCount}줄 제거 뿅!!!`;
+      state.message = depth > 1 ? `${depth}단 연쇄 폭발` : `${lineCount}줄 제거`;
       render();
 
       const lineBurstIntensity = Math.min(
@@ -2192,7 +2206,7 @@ async function runPlacement(anchorX, anchorY) {
       for (const group of linkedGroups) {
         linkedWave += 1;
         const linkedBurstColor = getDominantColorFromPositionKeys(group);
-        state.message = `연결 블록 펑${"!".repeat(Math.min(4, linkedWave + 1))}`;
+        state.message = `연쇄 파동 ${linkedWave}`;
         render();
         markPositionKeysForBlast(group, { depth, linked: true });
         const accel = Math.min(52, linkedWave * 6 + Math.min(26, group.size * 4) + Math.min(18, totalLinkedTargets));
@@ -2211,7 +2225,7 @@ async function runPlacement(anchorX, anchorY) {
         const linkedScore = Math.round(linkedRawScore * dangerScoreBoost);
         turnScore += linkedRawScore;
 
-        state.message = `펑! 연결 ${removedLinkedCells.length}칸`;
+        state.message = `연결 제거 ${removedLinkedCells.length}칸`;
         render();
         const linkedBurstIntensity = Math.min(
           4,
@@ -2316,7 +2330,7 @@ async function runPlacement(anchorX, anchorY) {
     } else {
       state.noClearStreak = 0;
       state.clearStreakTurns = 0;
-      state.message = "이번 턴은 클리어 실패.";
+      state.message = "이번 턴은 제거에 실패했습니다.";
     }
 
     turnScore = Math.round(turnScore * dangerScoreBoost);
@@ -2717,9 +2731,18 @@ function onWindowKeyDown(event) {
 }
 
 function render() {
-  elements.scoreValue.textContent = String(state.score);
-  elements.bestScoreValue.textContent = String(state.bestScore);
-  elements.collapseValue.textContent = String(state.collapse);
+  if (elements.scoreValue) {
+    elements.scoreValue.textContent = String(state.score);
+  }
+  if (elements.bestScoreValue) {
+    elements.bestScoreValue.textContent = String(state.bestScore);
+  }
+  if (elements.lastScoreValue) {
+    elements.lastScoreValue.textContent = String(state.lastScore);
+  }
+  if (elements.collapseValue) {
+    elements.collapseValue.textContent = String(state.collapse);
+  }
   if (elements.collapseWrap) {
     elements.collapseWrap.classList.toggle("is-danger", state.collapse <= LOW_TURN_WARNING_THRESHOLD);
   }
@@ -2748,6 +2771,10 @@ function render() {
 }
 
 function resetGame() {
+  if (state.gameOver && state.score > 0) {
+    state.lastScore = state.score;
+    setLastScore(state.lastScore);
+  }
   commitRankingIfNeeded();
   endDragInteraction();
   closeAdWatchModal();

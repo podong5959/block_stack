@@ -112,6 +112,24 @@ const BGM_GAIN_MULTIPLIER = 1.8;
 const SKIP_REROLL_MAX_ATTEMPTS = 12;
 const AD_SKELETON_WATCH_MS = 2100;
 const AD_SKELETON_STEP_MS = 90;
+const DANGER_SHARD_LAYOUT = [
+  { x: 8, y: 10, size: 42, rot: -18, driftX: -6, driftY: 3, alpha: 1, delay: 0 },
+  { x: 15, y: 6, size: 24, rot: 12, driftX: -3, driftY: 2, alpha: 0.8, delay: 120 },
+  { x: 27, y: 4, size: 18, rot: -8, driftX: 2, driftY: 3, alpha: 0.7, delay: 260 },
+  { x: 87, y: 7, size: 28, rot: 15, driftX: 4, driftY: 2, alpha: 0.82, delay: 80 },
+  { x: 94, y: 12, size: 44, rot: 21, driftX: 6, driftY: 4, alpha: 1, delay: 180 },
+  { x: 82, y: 18, size: 20, rot: -14, driftX: 4, driftY: -1, alpha: 0.68, delay: 300 },
+  { x: 5, y: 28, size: 22, rot: -10, driftX: -2, driftY: 5, alpha: 0.65, delay: 240 },
+  { x: 96, y: 34, size: 24, rot: 10, driftX: 4, driftY: 6, alpha: 0.72, delay: 140 },
+  { x: 4, y: 68, size: 30, rot: -16, driftX: -4, driftY: 5, alpha: 0.9, delay: 120 },
+  { x: 95, y: 72, size: 36, rot: 14, driftX: 5, driftY: 6, alpha: 0.9, delay: 60 },
+  { x: 11, y: 90, size: 46, rot: -20, driftX: -7, driftY: 4, alpha: 1, delay: 0 },
+  { x: 21, y: 95, size: 20, rot: 9, driftX: -4, driftY: 3, alpha: 0.74, delay: 180 },
+  { x: 35, y: 97, size: 16, rot: -7, driftX: 2, driftY: 2, alpha: 0.62, delay: 260 },
+  { x: 78, y: 95, size: 18, rot: 8, driftX: 3, driftY: 3, alpha: 0.6, delay: 320 },
+  { x: 89, y: 92, size: 34, rot: 17, driftX: 5, driftY: 4, alpha: 0.92, delay: 110 },
+  { x: 95, y: 88, size: 48, rot: 22, driftX: 8, driftY: 5, alpha: 1, delay: 20 },
+];
 
 const elements = {
   scoreValue: document.getElementById("scoreValue"),
@@ -163,6 +181,7 @@ const elements = {
   adWatchModal: document.getElementById("adWatchModal"),
   adWatchStatus: document.getElementById("adWatchStatus"),
   adWatchProgressFill: document.getElementById("adWatchProgressFill"),
+  dangerShardField: document.getElementById("dangerShardField"),
 };
 
 const audioState = {
@@ -2890,15 +2909,33 @@ function renderCollapseBar() {
   }
 }
 
+function ensureDangerShards() {
+  if (!elements.dangerShardField || elements.dangerShardField.childElementCount > 0) return;
+  for (const shardSpec of DANGER_SHARD_LAYOUT) {
+    const shard = document.createElement("span");
+    shard.className = "danger-shard";
+    shard.style.setProperty("--x", String(shardSpec.x));
+    shard.style.setProperty("--y", String(shardSpec.y));
+    shard.style.setProperty("--size", `${shardSpec.size}px`);
+    shard.style.setProperty("--rot", `${shardSpec.rot}deg`);
+    shard.style.setProperty("--drift-x", `${shardSpec.driftX}px`);
+    shard.style.setProperty("--drift-y", `${shardSpec.driftY}px`);
+    shard.style.setProperty("--alpha", String(shardSpec.alpha));
+    shard.style.setProperty("--delay", `${shardSpec.delay}ms`);
+    elements.dangerShardField.appendChild(shard);
+  }
+}
+
 function updateDangerPresentation() {
+  ensureDangerShards();
   const active = !state.gameOver && state.collapse <= LOW_TURN_WARNING_THRESHOLD;
   const strength = active
     ? (LOW_TURN_WARNING_THRESHOLD - Math.max(0, state.collapse) + 1) / LOW_TURN_WARNING_THRESHOLD
     : 0;
   document.body.classList.toggle("danger-zone", active);
-  document.documentElement.style.setProperty("--danger-screen-alpha", (strength * 0.24).toFixed(3));
-  document.documentElement.style.setProperty("--danger-glow-alpha", (strength * 0.34).toFixed(3));
-  document.documentElement.style.setProperty("--danger-board-alpha", (strength * 0.3).toFixed(3));
+  document.documentElement.style.setProperty("--danger-screen-alpha", (strength * 0.26).toFixed(3));
+  document.documentElement.style.setProperty("--danger-glow-alpha", (strength * 0.4).toFixed(3));
+  document.documentElement.style.setProperty("--danger-board-alpha", (strength * 0.34).toFixed(3));
 }
 
 function getCellFromPoint(clientX, clientY) {

@@ -67,21 +67,9 @@ body::after {
   background:
     radial-gradient(circle at 12% 18%, rgba(255, 255, 255, 0.6), transparent 20%),
     radial-gradient(circle at 88% 18%, rgba(var(--ambient-rgb), 0.24), transparent 18%),
-    radial-gradient(circle at 50% 104%, rgba(var(--ambient-rgb), 0.18), transparent 28%),
-    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0) 42%, rgba(221, 78, 54, var(--danger-screen-alpha)) 100%),
-    linear-gradient(
-      180deg,
-      rgba(221, 78, 54, calc(var(--danger-screen-alpha) * 0.36)),
-      transparent 26%,
-      transparent 72%,
-      rgba(221, 78, 54, calc(var(--danger-screen-alpha) * 0.64))
-    );
+    radial-gradient(circle at 50% 104%, rgba(var(--ambient-rgb), 0.18), transparent 28%);
   filter: blur(10px);
   transition: background 180ms ease;
-}
-
-body.danger-zone::after {
-  animation: danger-vignette-pulse 1100ms ease-in-out infinite alternate;
 }
 
 body.dragging-block {
@@ -122,22 +110,71 @@ body.settings-open {
   pointer-events: none;
 }
 
-.app-shell::after {
-  content: "";
+.danger-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 6;
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+body.danger-zone .danger-overlay {
+  opacity: 1;
+}
+
+.danger-vignette {
   position: absolute;
   inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
   background:
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0) 50%, rgba(112, 0, 6, calc(var(--danger-screen-alpha) * 0.9)) 76%, rgba(172, 0, 18, calc(var(--danger-screen-alpha) * 1.5)) 100%),
     linear-gradient(
       180deg,
-      rgba(221, 78, 54, calc(var(--danger-glow-alpha) * 0.5)),
-      transparent 30%,
-      transparent 68%,
-      rgba(221, 78, 54, calc(var(--danger-glow-alpha) * 0.7))
-    ),
-    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0), rgba(221, 78, 54, calc(var(--danger-glow-alpha) * 0.65)) 100%);
-  opacity: calc(var(--danger-glow-alpha) * 1.2);
+      rgba(118, 0, 12, calc(var(--danger-screen-alpha) * 0.75)),
+      transparent 20%,
+      transparent 80%,
+      rgba(118, 0, 12, calc(var(--danger-screen-alpha) * 0.9))
+    );
+  mix-blend-mode: multiply;
+  filter: saturate(132%) blur(1.5px);
+  animation: danger-vignette-pulse 1050ms ease-in-out infinite alternate;
+}
+
+.danger-shard-field {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.danger-shard {
+  position: absolute;
+  left: calc(var(--x) * 1%);
+  top: calc(var(--y) * 1%);
+  width: var(--size);
+  height: var(--size);
+  border-radius: 4px;
+  background:
+    linear-gradient(180deg, rgba(255, 162, 162, 0.95), rgba(146, 0, 17, 0.96));
+  border: 1px solid rgba(255, 208, 208, 0.28);
+  box-shadow:
+    0 0 0 1px rgba(82, 0, 8, 0.24),
+    0 0 18px rgba(139, 0, 20, 0.34),
+    inset 0 1px 0 rgba(255, 230, 230, 0.45);
+  clip-path: polygon(10% 0%, 100% 0%, 100% 78%, 84% 100%, 0% 100%, 0% 16%);
+  opacity: calc(var(--alpha, 1) * var(--danger-glow-alpha) * 1.9);
+  transform: translate(-50%, -50%) rotate(var(--rot)) scale(calc(0.8 + var(--danger-board-alpha) * 0.8));
+  animation: danger-shard-drift 980ms ease-in-out infinite alternate;
+  animation-delay: var(--delay, 0ms);
+}
+
+.danger-shard::before {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border-radius: 3px;
+  background:
+    linear-gradient(180deg, rgba(255, 228, 228, 0.44), rgba(255, 255, 255, 0)),
+    linear-gradient(180deg, rgba(220, 24, 45, 0.32), rgba(108, 0, 10, 0.08));
 }
 
 .app-shell > * {
@@ -878,20 +915,6 @@ body.settings-open {
   border: 1px solid rgba(255, 255, 255, 0.5);
   pointer-events: none;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.66);
-}
-
-body.danger-zone .app-shell {
-  animation: danger-shell-pulse 1200ms ease-in-out infinite;
-}
-
-body.danger-zone .board {
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.94),
-    inset 0 -20px 28px rgba(147, 170, 209, 0.2),
-    0 24px 34px rgba(98, 121, 160, 0.16),
-    0 0 0 1px rgba(221, 78, 54, calc(var(--danger-board-alpha) * 0.9)),
-    0 0 42px rgba(221, 78, 54, calc(var(--danger-board-alpha) * 0.85));
-  animation: danger-board-pulse 920ms ease-in-out infinite;
 }
 
 .cell {
@@ -1825,39 +1848,26 @@ body.danger-zone .board {
 
 @keyframes danger-vignette-pulse {
   0% {
-    opacity: 0.78;
-    filter: blur(10px) saturate(100%);
+    opacity: 0.82;
+    filter: saturate(112%) blur(1.5px);
   }
   100% {
     opacity: 1;
-    filter: blur(12px) saturate(120%);
+    filter: saturate(132%) blur(2.4px);
   }
 }
 
-@keyframes danger-shell-pulse {
+@keyframes danger-shard-drift {
   0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.004);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-
-@keyframes danger-board-pulse {
-  0% {
-    transform: scale(1);
+    transform: translate(-50%, -50%) rotate(var(--rot)) scale(calc(0.78 + var(--danger-board-alpha) * 0.78));
     filter: saturate(100%);
   }
-  50% {
-    transform: scale(1.01);
-    filter: saturate(118%);
-  }
   100% {
-    transform: scale(1);
-    filter: saturate(100%);
+    transform: translate(
+      calc(-50% + var(--drift-x, 0px)),
+      calc(-50% + var(--drift-y, 0px))
+    ) rotate(calc(var(--rot) + 9deg)) scale(calc(0.92 + var(--danger-board-alpha) * 0.98));
+    filter: saturate(128%);
   }
 }
 

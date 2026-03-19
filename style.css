@@ -121,26 +121,20 @@ body.settings-open {
 
 body.danger-zone .danger-overlay {
   opacity: 1;
+  animation: danger-edge-breathe 1800ms ease-in-out infinite;
 }
 
 .danger-vignette {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(90deg, rgba(255, 165, 165, calc(var(--danger-screen-alpha) * 1.2)) 0 14px, rgba(146, 0, 12, calc(var(--danger-screen-alpha) * 2.8)) 14px 32px, transparent 32px 44px) top left / 44px 28px repeat-x,
-    linear-gradient(90deg, rgba(255, 122, 122, calc(var(--danger-screen-alpha) * 0.95)) 0 10px, rgba(126, 0, 10, calc(var(--danger-screen-alpha) * 2.2)) 10px 22px, transparent 22px 32px) top 26px left / 32px 22px repeat-x,
-    linear-gradient(90deg, rgba(255, 165, 165, calc(var(--danger-screen-alpha) * 1.2)) 0 14px, rgba(146, 0, 12, calc(var(--danger-screen-alpha) * 2.8)) 14px 32px, transparent 32px 44px) bottom left / 44px 28px repeat-x,
-    linear-gradient(90deg, rgba(255, 122, 122, calc(var(--danger-screen-alpha) * 0.95)) 0 10px, rgba(126, 0, 10, calc(var(--danger-screen-alpha) * 2.2)) 10px 22px, transparent 22px 32px) bottom 26px left / 32px 22px repeat-x,
-    linear-gradient(180deg, rgba(255, 165, 165, calc(var(--danger-screen-alpha) * 1.15)) 0 14px, rgba(146, 0, 12, calc(var(--danger-screen-alpha) * 2.7)) 14px 32px, transparent 32px 44px) top left / 28px 44px repeat-y,
-    linear-gradient(180deg, rgba(255, 122, 122, calc(var(--danger-screen-alpha) * 0.92)) 0 10px, rgba(126, 0, 10, calc(var(--danger-screen-alpha) * 2.15)) 10px 22px, transparent 22px 32px) top 22px left / 22px 32px repeat-y,
-    linear-gradient(180deg, rgba(255, 165, 165, calc(var(--danger-screen-alpha) * 1.15)) 0 14px, rgba(146, 0, 12, calc(var(--danger-screen-alpha) * 2.7)) 14px 32px, transparent 32px 44px) top right / 28px 44px repeat-y,
-    linear-gradient(180deg, rgba(255, 122, 122, calc(var(--danger-screen-alpha) * 0.92)) 0 10px, rgba(126, 0, 10, calc(var(--danger-screen-alpha) * 2.15)) 10px 22px, transparent 22px 32px) top 22px right / 22px 32px repeat-y,
-    radial-gradient(circle at 0 0, rgba(168, 0, 18, calc(var(--danger-screen-alpha) * 1.45)), transparent 18%),
-    radial-gradient(circle at 100% 0, rgba(168, 0, 18, calc(var(--danger-screen-alpha) * 1.45)), transparent 18%),
-    radial-gradient(circle at 0 100%, rgba(168, 0, 18, calc(var(--danger-screen-alpha) * 1.45)), transparent 18%),
-    radial-gradient(circle at 100% 100%, rgba(168, 0, 18, calc(var(--danger-screen-alpha) * 1.45)), transparent 18%);
+    repeating-linear-gradient(90deg, rgba(255, 165, 165, calc(var(--danger-screen-alpha) * 1.15)) 0 14px, rgba(146, 0, 12, calc(var(--danger-screen-alpha) * 2.85)) 14px 32px, transparent 32px 44px) top left / 100% 28px no-repeat,
+    repeating-linear-gradient(90deg, rgba(255, 122, 122, calc(var(--danger-screen-alpha) * 0.92)) 0 10px, rgba(126, 0, 10, calc(var(--danger-screen-alpha) * 2.2)) 10px 22px, transparent 22px 32px) top 26px left / 100% 22px no-repeat,
+    repeating-linear-gradient(180deg, rgba(255, 165, 165, calc(var(--danger-screen-alpha) * 1.05)) 0 14px, rgba(146, 0, 12, calc(var(--danger-screen-alpha) * 2.55)) 14px 32px, transparent 32px 44px) top left / 28px 34% no-repeat,
+    repeating-linear-gradient(180deg, rgba(255, 165, 165, calc(var(--danger-screen-alpha) * 1.05)) 0 14px, rgba(146, 0, 12, calc(var(--danger-screen-alpha) * 2.55)) 14px 32px, transparent 32px 44px) top right / 28px 34% no-repeat,
+    radial-gradient(circle at 0 0, rgba(168, 0, 18, calc(var(--danger-screen-alpha) * 1.5)), transparent 20%),
+    radial-gradient(circle at 100% 0, rgba(168, 0, 18, calc(var(--danger-screen-alpha) * 1.5)), transparent 20%);
   filter: saturate(130%);
-  animation: danger-vignette-pulse 900ms ease-in-out infinite alternate;
 }
 
 .danger-shard-field {
@@ -1849,14 +1843,18 @@ body.danger-zone .danger-overlay {
   }
 }
 
-@keyframes danger-vignette-pulse {
+@keyframes danger-edge-breathe {
   0% {
-    opacity: 0.88;
-    filter: saturate(118%);
+    opacity: 0.18;
+  }
+  38% {
+    opacity: 0.92;
+  }
+  62% {
+    opacity: 1;
   }
   100% {
-    opacity: 1;
-    filter: saturate(138%);
+    opacity: 0.24;
   }
 }
 

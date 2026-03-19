@@ -2929,13 +2929,10 @@ function ensureDangerShards() {
 function updateDangerPresentation() {
   ensureDangerShards();
   const active = !state.gameOver && state.collapse <= LOW_TURN_WARNING_THRESHOLD;
-  const strength = active
-    ? (LOW_TURN_WARNING_THRESHOLD - Math.max(0, state.collapse) + 1) / LOW_TURN_WARNING_THRESHOLD
-    : 0;
   document.body.classList.toggle("danger-zone", active);
-  document.documentElement.style.setProperty("--danger-screen-alpha", (strength * 0.26).toFixed(3));
-  document.documentElement.style.setProperty("--danger-glow-alpha", (strength * 0.4).toFixed(3));
-  document.documentElement.style.setProperty("--danger-board-alpha", (strength * 0.34).toFixed(3));
+  document.documentElement.style.setProperty("--danger-screen-alpha", active ? "0.16" : "0");
+  document.documentElement.style.setProperty("--danger-glow-alpha", active ? "0.23" : "0");
+  document.documentElement.style.setProperty("--danger-board-alpha", active ? "0.18" : "0");
 }
 
 function getCellFromPoint(clientX, clientY) {

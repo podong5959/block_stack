@@ -107,8 +107,8 @@ const LOW_TURN_WARNING_THRESHOLD = 5;
 const BOARD_COLOR_FLASH_MIN_POPS = 15;
 const BOARD_COLOR_FLASH_MS = 360;
 const SCREEN_COLOR_FLASH_MS = 170;
-const SOUND_GAIN_MULTIPLIER = 1.3;
-const BGM_GAIN_MULTIPLIER = 4;
+const SOUND_GAIN_MULTIPLIER = 1.75;
+const BGM_GAIN_MULTIPLIER = 1.8;
 const SKIP_REROLL_MAX_ATTEMPTS = 12;
 const AD_SKELETON_WATCH_MS = 2100;
 const AD_SKELETON_STEP_MS = 90;
@@ -891,7 +891,8 @@ function stopBgmLoop() {
 }
 
 function syncBgmPlayback() {
-  if (audioState.bgmEnabled) {
+  const shouldPlay = audioState.bgmEnabled && !state.gameOver;
+  if (shouldPlay) {
     startBgmLoop();
   } else {
     stopBgmLoop();
@@ -1267,6 +1268,40 @@ function playAllClearSound() {
     q: 0.7,
     playbackRate: 1.25,
   });
+}
+
+function playGameOverSound() {
+  const ctx = ensureAudioContext();
+  if (!ctx) return;
+  const now = ctx.currentTime;
+  playImpactThump(ctx, {
+    start: now,
+    frequency: 144,
+    frequencyEnd: 48,
+    duration: 0.24,
+    gain: 0.026,
+    type: "sawtooth",
+  });
+  playNoiseBurst(ctx, {
+    start: now + 0.004,
+    duration: 0.09,
+    gain: 0.006,
+    filterType: "bandpass",
+    filterFrequency: 720,
+    q: 0.85,
+  });
+  const notes = [392, 330, 262];
+  for (let i = 0; i < notes.length; i += 1) {
+    playTone(ctx, {
+      frequency: notes[i],
+      frequencyEnd: notes[i] * 0.78,
+      duration: 0.18 + i * 0.02,
+      start: now + 0.05 + i * 0.085,
+      type: i === 0 ? "triangle" : "sine",
+      gain: 0.016 - i * 0.002,
+      attack: 0.005,
+    });
+  }
 }
 
 function playMegaBurstCelebrateSound(poppedCells) {
@@ -2088,6 +2123,7 @@ function runEndingContinue() {
   state.gameOver = false;
   state.clearStreakTurns = 0;
   state.message = "횟수 5회 추가! 계속 진행합니다.";
+  syncBgmPlayback();
   resetEndingLayerVisuals();
   nextTurnBlock();
   if (!hasAnyPlacement(state.currentBlock)) {
@@ -2357,6 +2393,8 @@ function setGameOver(reason) {
   endDragInteraction();
   state.gameOver = true;
   state.message = reason;
+  syncBgmPlayback();
+  playGameOverSound();
   if (state.continueUsedThisGame) {
     commitRankingIfNeeded();
   }
@@ -2852,6 +2890,17 @@ function renderCollapseBar() {
   }
 }
 
+function updateDangerPresentation() {
+  const active = !state.gameOver && state.collapse <= LOW_TURN_WARNING_THRESHOLD;
+  const strength = active
+    ? (LOW_TURN_WARNING_THRESHOLD - Math.max(0, state.collapse) + 1) / LOW_TURN_WARNING_THRESHOLD
+    : 0;
+  document.body.classList.toggle("danger-zone", active);
+  document.documentElement.style.setProperty("--danger-screen-alpha", (strength * 0.24).toFixed(3));
+  document.documentElement.style.setProperty("--danger-glow-alpha", (strength * 0.34).toFixed(3));
+  document.documentElement.style.setProperty("--danger-board-alpha", (strength * 0.3).toFixed(3));
+}
+
 function getCellFromPoint(clientX, clientY) {
   const metrics = state.dragBoardMetrics || readBoardMetrics();
   const { rect, paddingX, paddingY, gap, cellWidth, cellHeight } = metrics;
@@ -3087,6 +3136,7 @@ function render() {
   if (elements.collapseWrap) {
     elements.collapseWrap.classList.toggle("is-danger", state.collapse <= LOW_TURN_WARNING_THRESHOLD);
   }
+  updateDangerPresentation();
   if (elements.endingScoreValue) {
     elements.endingScoreValue.textContent = String(state.score);
   }
@@ -3156,6 +3206,7 @@ function resetGame() {
     ? "이번 판은 올클리어 달성 시 보너스 강화 모드입니다."
     : "현재 블록을 드래그해서 보드에 놓으세요.";
   state.currentBlock = generateBlock();
+  syncBgmPlayback();
   render();
 }
 

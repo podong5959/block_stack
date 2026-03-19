@@ -172,6 +172,8 @@ const audioState = {
   lastVoiceAt: 0,
   bgmTimerId: null,
   bgmStep: 0,
+  noiseBuffer: null,
+  noiseBufferSampleRate: 0,
 };
 
 const initialPlayerId = getPlayerId();
@@ -735,24 +737,118 @@ function playTone(ctx, {
   start = ctx.currentTime,
   type = "triangle",
   gain = 0.04,
+  attack = 0.01,
+  detune = 0,
 } = {}) {
   // Prevent queued bursts while AudioContext is suspended by autoplay policy.
   if (!ctx || ctx.state !== "running") return;
   const osc = ctx.createOscillator();
   const amp = ctx.createGain();
   const finalGain = Math.min(0.25, Math.max(0.0001, gain * SOUND_GAIN_MULTIPLIER));
+  const safeAttack = Math.max(0.002, Math.min(duration * 0.45, attack));
   osc.type = type;
   osc.frequency.value = frequency;
+  osc.detune.value = detune;
   if (Number.isFinite(frequencyEnd)) {
     osc.frequency.exponentialRampToValueAtTime(Math.max(20, frequencyEnd), start + duration);
   }
   amp.gain.setValueAtTime(0.0001, start);
-  amp.gain.exponentialRampToValueAtTime(finalGain, start + 0.01);
+  amp.gain.exponentialRampToValueAtTime(finalGain, start + safeAttack);
   amp.gain.exponentialRampToValueAtTime(0.0001, start + duration);
   osc.connect(amp);
   amp.connect(ctx.destination);
   osc.start(start);
   osc.stop(start + duration + 0.02);
+}
+
+function getNoiseBuffer(ctx) {
+  if (
+    audioState.noiseBuffer
+    && audioState.noiseBufferSampleRate === ctx.sampleRate
+  ) {
+    return audioState.noiseBuffer;
+  }
+
+  const length = Math.max(1, Math.floor(ctx.sampleRate * 0.5));
+  const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < length; i += 1) {
+    data[i] = (Math.random() * 2 - 1) * (1 - i / length * 0.12);
+  }
+  audioState.noiseBuffer = buffer;
+  audioState.noiseBufferSampleRate = ctx.sampleRate;
+  return buffer;
+}
+
+function playNoiseBurst(ctx, {
+  start = ctx.currentTime,
+  duration = 0.06,
+  gain = 0.018,
+  filterType = "bandpass",
+  filterFrequency = 1400,
+  q = 0.9,
+  playbackRate = 1,
+} = {}) {
+  if (!ctx || ctx.state !== "running") return;
+  const source = ctx.createBufferSource();
+  const filter = ctx.createBiquadFilter();
+  const amp = ctx.createGain();
+  const finalGain = Math.min(0.14, Math.max(0.0001, gain * SOUND_GAIN_MULTIPLIER));
+  source.buffer = getNoiseBuffer(ctx);
+  source.playbackRate.value = playbackRate;
+  filter.type = filterType;
+  filter.frequency.value = filterFrequency;
+  filter.Q.value = q;
+  amp.gain.setValueAtTime(0.0001, start);
+  amp.gain.exponentialRampToValueAtTime(finalGain, start + Math.min(0.008, duration * 0.25));
+  amp.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+  source.connect(filter);
+  filter.connect(amp);
+  amp.connect(ctx.destination);
+  source.start(start);
+  source.stop(start + duration + 0.02);
+}
+
+function playImpactThump(ctx, {
+  start = ctx.currentTime,
+  frequency = 180,
+  frequencyEnd = 78,
+  duration = 0.11,
+  gain = 0.02,
+  type = "triangle",
+} = {}) {
+  playTone(ctx, {
+    frequency,
+    frequencyEnd,
+    duration,
+    start,
+    type,
+    gain,
+    attack: 0.004,
+  });
+}
+
+function playArpeggio(ctx, frequencies, {
+  start = ctx.currentTime,
+  step = 0.035,
+  duration = 0.085,
+  gain = 0.018,
+  type = "triangle",
+  glideRatio = 0.84,
+} = {}) {
+  if (!ctx || ctx.state !== "running") return;
+  for (let i = 0; i < frequencies.length; i += 1) {
+    const frequency = frequencies[i];
+    playTone(ctx, {
+      frequency,
+      frequencyEnd: Math.max(30, frequency * glideRatio),
+      duration,
+      start: start + i * step,
+      type,
+      gain,
+      attack: 0.006,
+    });
+  }
 }
 
 function playBgmStep() {
@@ -811,38 +907,112 @@ function playPlacementSound() {
   const ctx = ensureAudioContext();
   if (!ctx) return;
   const now = ctx.currentTime;
-  playTone(ctx, { frequency: 310, duration: 0.06, start: now, type: "sine", gain: 0.03 });
+  playImpactThump(ctx, {
+    start: now,
+    frequency: 230,
+    frequencyEnd: 128,
+    duration: 0.07,
+    gain: 0.011,
+    type: "triangle",
+  });
+  playTone(ctx, {
+    frequency: 760,
+    frequencyEnd: 520,
+    duration: 0.055,
+    start: now + 0.006,
+    type: "sine",
+    gain: 0.014,
+    attack: 0.004,
+  });
+  playNoiseBurst(ctx, {
+    start: now,
+    duration: 0.028,
+    gain: 0.0048,
+    filterType: "bandpass",
+    filterFrequency: 1850,
+    q: 1.2,
+    playbackRate: 1.2,
+  });
+}
+
+function playBlockedDropSound() {
+  const ctx = ensureAudioContext();
+  if (!ctx) return;
+  const now = ctx.currentTime;
+  playTone(ctx, {
+    frequency: 240,
+    frequencyEnd: 150,
+    duration: 0.08,
+    start: now,
+    type: "square",
+    gain: 0.01,
+    attack: 0.003,
+  });
+  playNoiseBurst(ctx, {
+    start: now,
+    duration: 0.04,
+    gain: 0.004,
+    filterType: "highpass",
+    filterFrequency: 720,
+    q: 0.7,
+  });
 }
 
 function playClearSound(linesCleared, scoreGain) {
   const ctx = ensureAudioContext();
   if (!ctx) return;
   const now = ctx.currentTime;
-  const notes = Math.min(5, Math.max(2, linesCleared + 2));
-  playTone(ctx, {
-    frequency: 120 + linesCleared * 18,
-    duration: 0.1,
+  const intensity = Math.min(5, Math.max(linesCleared, 1 + Math.floor(scoreGain / 700)));
+  const noteCount = Math.min(6, Math.max(3, linesCleared + 2));
+  const root = 420 + linesCleared * 24;
+
+  playImpactThump(ctx, {
     start: now,
-    type: "sawtooth",
-    gain: 0.028,
+    frequency: 172 + linesCleared * 22,
+    frequencyEnd: 86,
+    duration: 0.105 + intensity * 0.008,
+    gain: 0.013 + intensity * 0.0022,
+    type: "triangle",
   });
-  for (let i = 0; i < notes; i += 1) {
-    const frequency = 460 + i * 96 + linesCleared * 20;
-    playTone(ctx, {
-      frequency,
-      duration: 0.095,
-      start: now + 0.02 + i * 0.05,
-      type: "square",
-      gain: 0.04,
-    });
-  }
+  playNoiseBurst(ctx, {
+    start: now + 0.002,
+    duration: 0.045 + intensity * 0.008,
+    gain: 0.006 + intensity * 0.0018,
+    filterType: "bandpass",
+    filterFrequency: 920 + intensity * 180,
+    q: 0.9,
+  });
+
+  const scale = [0, 4, 7, 11, 14, 19]
+    .slice(0, noteCount)
+    .map((semi) => root * 2 ** (semi / 12));
+  playArpeggio(ctx, scale, {
+    start: now + 0.018,
+    step: Math.max(0.022, 0.038 - intensity * 0.003),
+    duration: 0.07 + intensity * 0.005,
+    gain: 0.013 + intensity * 0.0016,
+    type: intensity >= 4 ? "square" : "triangle",
+    glideRatio: 0.82,
+  });
+
   if (scoreGain >= 600) {
     playTone(ctx, {
-      frequency: 1060,
-      duration: 0.14,
-      start: now + notes * 0.05,
-      type: "triangle",
-      gain: 0.06,
+      frequency: 1180 + linesCleared * 34,
+      frequencyEnd: 820,
+      duration: 0.12,
+      start: now + 0.04 + noteCount * 0.022,
+      type: "sine",
+      gain: 0.026,
+      attack: 0.004,
+    });
+    playNoiseBurst(ctx, {
+      start: now + 0.035,
+      duration: 0.06,
+      gain: 0.0045,
+      filterType: "highpass",
+      filterFrequency: 2200,
+      q: 0.6,
+      playbackRate: 1.25,
     });
   }
 }
@@ -854,36 +1024,56 @@ function playLinkedBurstSound({ cells = 1, wave = 1, totalCells = 1 } = {}) {
   const power = Math.min(12, cells + Math.floor(totalCells / 3));
   const hits = Math.min(7, Math.max(2, Math.ceil(cells / 2) + Math.floor(totalCells / 6)));
   const cadence = Math.max(0.02, 0.072 - power * 0.003 - wave * 0.0018);
-  const basePitch = 420 + Math.min(140, cells * 18);
+  const basePitch = 360 + Math.min(190, cells * 20) + wave * 6;
 
   for (let i = 0; i < hits; i += 1) {
     const start = now + i * cadence;
     playTone(ctx, {
       frequency: basePitch + i * 24,
-      frequencyEnd: 300 + i * 10,
-      duration: 0.07,
+      frequencyEnd: 250 + i * 10,
+      duration: 0.062,
       start,
-      type: "sine",
-      gain: 0.018 + Math.min(0.022, cells * 0.0032),
+      type: i % 2 === 0 ? "triangle" : "sine",
+      gain: 0.011 + Math.min(0.016, cells * 0.0018),
+      attack: 0.004,
+    });
+    playNoiseBurst(ctx, {
+      start: start + 0.003,
+      duration: 0.024 + Math.min(0.01, power * 0.0015),
+      gain: 0.0038 + Math.min(0.0042, totalCells * 0.00045),
+      filterType: "bandpass",
+      filterFrequency: 980 + power * 80 + i * 45,
+      q: 1.1,
+      playbackRate: 1.08 + i * 0.03,
     });
     playTone(ctx, {
-      frequency: 690 + i * 20 + wave * 18,
-      frequencyEnd: 520 + i * 6,
-      duration: 0.045,
-      start: start + 0.01,
-      type: "triangle",
-      gain: 0.012 + Math.min(0.014, totalCells * 0.0012),
+      frequency: 760 + i * 28 + wave * 16,
+      frequencyEnd: 560 + i * 12,
+      duration: 0.04,
+      start: start + 0.008,
+      type: "sine",
+      gain: 0.006 + Math.min(0.008, totalCells * 0.0006),
+      attack: 0.003,
     });
   }
 
   if (cells >= 5 || totalCells >= 12) {
-    playTone(ctx, {
-      frequency: 360 + Math.min(80, cells * 8),
-      frequencyEnd: 260,
+    playImpactThump(ctx, {
+      start: now + hits * cadence * 0.3,
+      frequency: 230 + Math.min(90, cells * 10),
+      frequencyEnd: 110,
       duration: 0.1,
-      start: now + hits * cadence * 0.35,
       type: "triangle",
-      gain: 0.016,
+      gain: 0.012,
+    });
+    playTone(ctx, {
+      frequency: 1020 + totalCells * 6,
+      frequencyEnd: 760,
+      duration: 0.08,
+      start: now + hits * cadence * 0.38,
+      type: "triangle",
+      gain: 0.013,
+      attack: 0.004,
     });
   }
 }
@@ -897,50 +1087,73 @@ function playComboVoiceCue(text = "굿", options = {}) {
   const now = ctx.currentTime;
   const cue = (text || "").toLowerCase();
   const volume = options.volume ?? 0.9;
+  const rate = Math.max(0.65, Math.min(1.35, options.rate ?? 1));
+  const pitch = Math.max(0.65, Math.min(1.45, options.pitch ?? 1));
 
   if (cue.includes("wow") || cue.includes("와")) {
     playTone(ctx, {
-      frequency: 290,
-      frequencyEnd: 220,
-      duration: 0.2,
+      frequency: 290 * pitch,
+      frequencyEnd: 220 * pitch,
+      duration: 0.2 / rate,
       start: now,
       type: "sawtooth",
       gain: 0.03 * volume,
+      attack: 0.005,
     });
     playTone(ctx, {
-      frequency: 520,
-      frequencyEnd: 420,
-      duration: 0.22,
-      start: now + 0.04,
+      frequency: 520 * pitch,
+      frequencyEnd: 420 * pitch,
+      duration: 0.22 / rate,
+      start: now + 0.04 / rate,
       type: "triangle",
       gain: 0.024 * volume,
+      attack: 0.005,
     });
     playTone(ctx, {
-      frequency: 760,
-      frequencyEnd: 560,
-      duration: 0.24,
-      start: now + 0.09,
+      frequency: 760 * pitch,
+      frequencyEnd: 560 * pitch,
+      duration: 0.24 / rate,
+      start: now + 0.09 / rate,
       type: "sine",
       gain: 0.02 * volume,
+      attack: 0.004,
+    });
+    playNoiseBurst(ctx, {
+      start: now + 0.11 / rate,
+      duration: 0.04 / rate,
+      gain: 0.0035 * volume,
+      filterType: "highpass",
+      filterFrequency: 1800 * pitch,
+      q: 0.7,
     });
     return true;
   }
 
   playTone(ctx, {
-    frequency: 360,
-    frequencyEnd: 270,
-    duration: 0.18,
+    frequency: 360 * pitch,
+    frequencyEnd: 270 * pitch,
+    duration: 0.18 / rate,
     start: now,
     type: "triangle",
     gain: 0.026 * volume,
+    attack: 0.005,
   });
   playTone(ctx, {
-    frequency: 430,
-    frequencyEnd: 300,
-    duration: 0.22,
-    start: now + 0.06,
+    frequency: 430 * pitch,
+    frequencyEnd: 300 * pitch,
+    duration: 0.22 / rate,
+    start: now + 0.06 / rate,
     type: "sine",
     gain: 0.022 * volume,
+    attack: 0.004,
+  });
+  playNoiseBurst(ctx, {
+    start: now + 0.03 / rate,
+    duration: 0.026 / rate,
+    gain: 0.0025 * volume,
+    filterType: "bandpass",
+    filterFrequency: 1300 * pitch,
+    q: 0.9,
   });
   return true;
 }
@@ -949,35 +1162,50 @@ function playDopamineClearSound({ lines = 2, chain = 1 } = {}) {
   const ctx = ensureAudioContext();
   if (!ctx) return;
   const now = ctx.currentTime;
-  const notes = Math.min(6, 3 + lines + Math.floor(chain / 2));
-  const step = Math.max(0.024, 0.056 - (lines - 2) * 0.006 - Math.max(0, chain - 1) * 0.003);
+  const intensity = Math.min(7, lines + chain);
+  const noteCount = Math.min(7, 4 + lines + Math.floor(chain / 2));
+  const step = Math.max(0.02, 0.05 - (lines - 2) * 0.004 - Math.max(0, chain - 1) * 0.0025);
+  const root = 520 + lines * 22 + chain * 10;
 
-  playTone(ctx, {
-    frequency: 260 + lines * 20,
-    frequencyEnd: 180,
-    duration: 0.11,
+  playImpactThump(ctx, {
     start: now,
+    frequency: 188 + lines * 18,
+    frequencyEnd: 84,
+    duration: 0.13,
+    gain: 0.014 + intensity * 0.0014,
     type: "sawtooth",
-    gain: 0.028,
+  });
+  playNoiseBurst(ctx, {
+    start: now + 0.006,
+    duration: 0.055,
+    gain: 0.005 + intensity * 0.0007,
+    filterType: "bandpass",
+    filterFrequency: 1100 + intensity * 110,
+    q: 1,
   });
 
-  for (let i = 0; i < notes; i += 1) {
-    const start = now + 0.014 + i * step;
+  const scale = [0, 4, 7, 12, 16, 19, 24]
+    .slice(0, noteCount)
+    .map((semi) => root * 2 ** (semi / 12));
+  playArpeggio(ctx, scale, {
+    start: now + 0.016,
+    step,
+    duration: 0.08,
+    gain: 0.015 + intensity * 0.0011,
+    type: "triangle",
+    glideRatio: 0.86,
+  });
+
+  for (let i = Math.max(0, scale.length - 3); i < scale.length; i += 1) {
+    const start = now + 0.022 + i * step;
     playTone(ctx, {
-      frequency: 690 + i * 88 + lines * 18,
-      frequencyEnd: 520 + i * 40,
-      duration: 0.085,
+      frequency: scale[i] * 1.5,
+      frequencyEnd: scale[i] * 1.16,
+      duration: 0.062,
       start,
-      type: "square",
-      gain: 0.038,
-    });
-    playTone(ctx, {
-      frequency: 520 + i * 64,
-      frequencyEnd: 360 + i * 28,
-      duration: 0.07,
-      start: start + 0.01,
-      type: "triangle",
-      gain: 0.026,
+      type: "sine",
+      gain: 0.009 + intensity * 0.0008,
+      attack: 0.004,
     });
   }
 }
@@ -986,22 +1214,58 @@ function playAllClearSound() {
   const ctx = ensureAudioContext();
   if (!ctx) return;
   const now = ctx.currentTime;
-  const chord = [523, 659, 784, 988];
+  const chord = [523, 659, 784, 1047];
+  playImpactThump(ctx, {
+    start: now,
+    frequency: 154,
+    frequencyEnd: 62,
+    duration: 0.2,
+    gain: 0.022,
+    type: "triangle",
+  });
+  playNoiseBurst(ctx, {
+    start: now + 0.01,
+    duration: 0.08,
+    gain: 0.006,
+    filterType: "bandpass",
+    filterFrequency: 980,
+    q: 0.9,
+  });
   for (let i = 0; i < chord.length; i += 1) {
     playTone(ctx, {
       frequency: chord[i],
-      duration: 0.16 + i * 0.02,
+      duration: 0.19 + i * 0.03,
       start: now + i * 0.04,
       type: "triangle",
-      gain: 0.06,
+      gain: 0.032 + i * 0.003,
+      attack: 0.006,
+    });
+    playTone(ctx, {
+      frequency: chord[i] * 2,
+      frequencyEnd: chord[i] * 1.6,
+      duration: 0.15,
+      start: now + 0.02 + i * 0.04,
+      type: "sine",
+      gain: 0.015,
+      attack: 0.004,
     });
   }
-  playTone(ctx, {
-    frequency: 1320,
-    duration: 0.2,
+  playArpeggio(ctx, [988, 1175, 1397], {
+    start: now + 0.18,
+    step: 0.05,
+    duration: 0.12,
+    gain: 0.02,
+    type: "triangle",
+    glideRatio: 0.9,
+  });
+  playNoiseBurst(ctx, {
     start: now + 0.22,
-    type: "sine",
-    gain: 0.07,
+    duration: 0.09,
+    gain: 0.004,
+    filterType: "highpass",
+    filterFrequency: 2400,
+    q: 0.7,
+    playbackRate: 1.25,
   });
 }
 
@@ -1011,7 +1275,24 @@ function playMegaBurstCelebrateSound(poppedCells) {
   const now = ctx.currentTime;
   const power = Math.min(8, Math.floor((poppedCells - BOARD_COLOR_FLASH_MIN_POPS) / 2) + 3);
 
-  // "쀼루룩" 느낌의 빠른 상승 글라이드.
+  playImpactThump(ctx, {
+    start: now,
+    frequency: 148 + power * 10,
+    frequencyEnd: 60,
+    duration: 0.16,
+    gain: 0.019 + power * 0.0018,
+    type: "sawtooth",
+  });
+  playNoiseBurst(ctx, {
+    start: now + 0.006,
+    duration: 0.065,
+    gain: 0.006 + power * 0.0006,
+    filterType: "bandpass",
+    filterFrequency: 820 + power * 70,
+    q: 0.85,
+  });
+
+  // 빠르게 치솟는 글라이드.
   for (let i = 0; i < 4; i += 1) {
     const start = now + i * 0.028;
     playTone(ctx, {
@@ -1021,19 +1302,28 @@ function playMegaBurstCelebrateSound(poppedCells) {
       start,
       type: "triangle",
       gain: 0.024 + power * 0.0018,
+      attack: 0.004,
     });
   }
 
-  // "빵빵빵" 3연타 임팩트.
+  // 3연타 임팩트.
   for (let i = 0; i < 3; i += 1) {
     const start = now + 0.14 + i * 0.085;
-    playTone(ctx, {
+    playImpactThump(ctx, {
+      start,
       frequency: 220 + i * 26,
       frequencyEnd: 120,
       duration: 0.13,
-      start,
       type: "sawtooth",
       gain: 0.028 + power * 0.0022,
+    });
+    playNoiseBurst(ctx, {
+      start: start + 0.004,
+      duration: 0.05,
+      gain: 0.005 + power * 0.0007,
+      filterType: "bandpass",
+      filterFrequency: 1100 + i * 120 + power * 50,
+      q: 0.95,
     });
     playTone(ctx, {
       frequency: 780 + i * 34,
@@ -1042,6 +1332,19 @@ function playMegaBurstCelebrateSound(poppedCells) {
       start: start + 0.012,
       type: "square",
       gain: 0.026 + power * 0.0017,
+      attack: 0.004,
+    });
+  }
+
+  if (power >= 6) {
+    playTone(ctx, {
+      frequency: 1220 + power * 18,
+      frequencyEnd: 760,
+      duration: 0.11,
+      start: now + 0.33,
+      type: "triangle",
+      gain: 0.024,
+      attack: 0.004,
     });
   }
 }
@@ -2133,6 +2436,7 @@ async function runPlacement(anchorX, anchorY) {
 
   if (!canPlaceBlock(state.currentBlock, anchorX, anchorY)) {
     state.message = "드롭 위치가 유효하지 않습니다.";
+    playBlockedDropSound();
     render();
     return;
   }
@@ -2738,6 +3042,7 @@ function onDragEnd(event) {
   }
 
   state.message = "유효한 칸에 드롭해 주세요.";
+  playBlockedDropSound();
   render();
 }
 

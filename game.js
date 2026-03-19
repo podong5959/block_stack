@@ -1795,10 +1795,12 @@ function runEndingContinue() {
   render();
 }
 
-function spawnCellBurstParticles(cells, burstIntensity = 1) {
+function spawnCellBurstParticles(cells, burstIntensity = 1, color = null) {
   const unique = new Set(cells.map((cell) => `${cell.x},${cell.y}`));
   const cappedKeys = Array.from(unique).slice(0, 24 + burstIntensity * 8);
   const sparksPerCell = Math.min(4, 2 + Math.floor(burstIntensity / 2));
+  const shardsPerCell = Math.min(3, 1 + Math.floor(burstIntensity / 2));
+  const burstRgb = hexToRgbString(color) || "255, 207, 90";
   for (const key of cappedKeys) {
     const [xStr, yStr] = key.split(",");
     const x = Number(xStr);
@@ -1817,13 +1819,30 @@ function spawnCellBurstParticles(cells, burstIntensity = 1) {
       burst.style.setProperty("--spark-dx", `${spreadX}px`);
       burst.style.setProperty("--spark-dy", `${spreadY}px`);
       burst.style.setProperty("--spark-scale", scale);
+      burst.style.setProperty("--spark-rgb", burstRgb);
       elements.board.appendChild(burst);
       burst.addEventListener("animationend", () => burst.remove(), { once: true });
+    }
+
+    for (let i = 0; i < shardsPerCell; i += 1) {
+      const shard = document.createElement("span");
+      shard.className = "burst-shard";
+      const spreadX = randomInt(-28 - burstIntensity * 6, 28 + burstIntensity * 6);
+      const spreadY = randomInt(-42 - burstIntensity * 8, 8);
+      shard.style.left = `${cellEl.offsetLeft + cellEl.offsetWidth / 2}px`;
+      shard.style.top = `${cellEl.offsetTop + cellEl.offsetHeight / 2}px`;
+      shard.style.setProperty("--shard-dx", `${spreadX}px`);
+      shard.style.setProperty("--shard-dy", `${spreadY}px`);
+      shard.style.setProperty("--shard-rot", `${randomInt(-140, 140)}deg`);
+      shard.style.setProperty("--shard-scale", `${(0.8 + Math.random() * 0.6).toFixed(2)}`);
+      shard.style.setProperty("--shard-rgb", burstRgb);
+      elements.board.appendChild(shard);
+      shard.addEventListener("animationend", () => shard.remove(), { once: true });
     }
   }
 }
 
-function spawnBurstWave(cells, intensity) {
+function spawnBurstWave(cells, intensity, color = null) {
   if (cells.length === 0) return;
   const unique = Array.from(new Set(cells.map((cell) => `${cell.x},${cell.y}`)));
   let sumX = 0;
@@ -1846,6 +1865,7 @@ function spawnBurstWave(cells, intensity) {
   wave.style.left = `${sumX / count}px`;
   wave.style.top = `${sumY / count}px`;
   wave.style.setProperty("--wave-size", `${100 + intensity * 14}px`);
+  wave.style.setProperty("--wave-rgb", hexToRgbString(color) || "255, 170, 58");
   elements.board.appendChild(wave);
   wave.addEventListener("animationend", () => wave.remove(), { once: true });
 }
@@ -2179,8 +2199,12 @@ async function runPlacement(anchorX, anchorY) {
       );
       const lineEffectCells = removedLineCells.length > 0 ? removedLineCells : [{ x: 2, y: 2 }, { x: 3, y: 3 }];
       triggerBoardBurst(lineCount, lineEffectCells.length, lineBurstIntensity);
-      spawnCellBurstParticles(lineEffectCells, lineBurstIntensity);
-      spawnBurstWave(lineEffectCells, lineCount + Math.floor(lineEffectCells.length / 3) + lineBurstIntensity);
+      spawnCellBurstParticles(lineEffectCells, lineBurstIntensity, lineBurstColor);
+      spawnBurstWave(
+        lineEffectCells,
+        lineCount + Math.floor(lineEffectCells.length / 3) + lineBurstIntensity,
+        lineBurstColor
+      );
       spawnScorePopup(lineEffectCells, lineScore, lineEffectCells.length, lineBurstIntensity);
       playClearSound(lineCount, lineScore);
       if (depth > 1 || linkedGroups.length > 0) {
@@ -2232,8 +2256,12 @@ async function runPlacement(anchorX, anchorY) {
           1 + Math.floor(removedLinkedCells.length / 3) + Math.floor(linkedWave / 2)
         );
         triggerBoardBurst(1, removedLinkedCells.length, linkedBurstIntensity);
-        spawnCellBurstParticles(removedLinkedCells, linkedBurstIntensity);
-        spawnBurstWave(removedLinkedCells, linkedBurstIntensity + Math.floor(removedLinkedCells.length / 2));
+        spawnCellBurstParticles(removedLinkedCells, linkedBurstIntensity, linkedBurstColor);
+        spawnBurstWave(
+          removedLinkedCells,
+          linkedBurstIntensity + Math.floor(removedLinkedCells.length / 2),
+          linkedBurstColor
+        );
         spawnScorePopup(removedLinkedCells, linkedScore, removedLinkedCells.length, linkedBurstIntensity);
         playLinkedBurstSound({
           cells: removedLinkedCells.length,
@@ -2259,7 +2287,11 @@ async function runPlacement(anchorX, anchorY) {
         spawnMegaBurstBanner(cyclePoppedTotal);
         playMegaBurstCelebrateSound(cyclePoppedTotal);
         if (cycleBurstCells.length > 0) {
-          spawnBurstWave(cycleBurstCells, Math.min(8, 5 + Math.floor(cyclePoppedTotal / 4)));
+          spawnBurstWave(
+            cycleBurstCells,
+            Math.min(8, 5 + Math.floor(cyclePoppedTotal / 4)),
+            dominantColor
+          );
         }
       }
 
@@ -2293,8 +2325,12 @@ async function runPlacement(anchorX, anchorY) {
       const allClearScore = Math.round(allClearBonus * dangerScoreBoost);
       const allClearBurstIntensity = Math.min(5, 4 + Math.floor(allClearBonus / 1100));
       triggerBoardBurst(Math.max(3, turnLineCount), allClearCells.length, allClearBurstIntensity);
-      spawnCellBurstParticles(allClearCells, allClearBurstIntensity);
-      spawnBurstWave(allClearCells, Math.max(5, turnLineCount + Math.floor(allClearCells.length / 3)));
+      spawnCellBurstParticles(allClearCells, allClearBurstIntensity, "#ffd059");
+      spawnBurstWave(
+        allClearCells,
+        Math.max(5, turnLineCount + Math.floor(allClearCells.length / 3)),
+        "#ffd059"
+      );
       spawnScorePopup(allClearCells, allClearScore, allClearCells.length, allClearBurstIntensity);
       spawnAllClearBanner(allClearBonus, allClearGuaranteed);
       playAllClearSound();

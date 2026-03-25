@@ -2909,7 +2909,7 @@ function renderBoard() {
       if (top) {
         button.classList.add("filled");
         applyCellColorVars(button, top);
-        applyCellFace(button, `${x},${y}:${top}:${cell.stack.length}`);
+        applyCellFace(button, top);
       }
 
       const depth = cell.stack.length;
@@ -2965,7 +2965,7 @@ function createMiniGrid(block, options = {}) {
       if (cellColor) {
         mini.classList.add("fill");
         applyCellColorVars(mini, cellColor);
-        applyCellFace(mini, `${shapeX},${shapeY}:${cellColor}`);
+        applyCellFace(mini, cellColor);
         if (attachShapeData) {
           mini.dataset.dx = String(shapeX);
           mini.dataset.dy = String(shapeY);

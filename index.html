@@ -33,19 +33,21 @@
       </div>
     </header>
 
-    <section class="board-area">
-      <div id="board" class="board" aria-label="6x6 game board"></div>
-    </section>
+    <section class="play-stage">
+      <section class="board-area">
+        <div id="board" class="board" aria-label="6x6 game board"></div>
+      </section>
 
-    <section class="controls">
-      <div class="controls-head">
-        <div class="controls-copy">
-          <span class="controls-kicker">NEXT BLOCK</span>
-          <strong class="controls-title">다음 블럭</strong>
+      <section class="controls">
+        <div class="controls-head">
+          <div class="controls-copy">
+            <span class="controls-kicker">NEXT BLOCK</span>
+            <strong class="controls-title">다음 블럭</strong>
+          </div>
+          <button id="skipButton" type="button" class="skip-btn">SKIP</button>
         </div>
-        <button id="skipButton" type="button" class="skip-btn">SKIP</button>
-      </div>
-      <div id="currentBlockView" class="block-view"></div>
+        <div id="currentBlockView" class="block-view"></div>
+      </section>
     </section>
 
     <div id="gameOverLayer" class="game-over-layer hidden">

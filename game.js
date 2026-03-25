@@ -1,5 +1,5 @@
 const BOARD_SIZE = 6;
-const COLORS = ["#ff8eab", "#79d7be", "#97deff", "#ffd384", "#ffad60", "#b39dff", "#9fda74"];
+const COLORS = ["#ff6f91", "#2fc8a7", "#5bb8ff", "#ffd24d", "#ff9c43", "#8f7cff", "#86d93f"];
 const BLOCK_SIZE_WEIGHTS = [
   { size: 3, weight: 0.5 },
   { size: 4, weight: 0.3 },
@@ -1534,6 +1534,15 @@ function getBlockCellColor(block, index = 0) {
   return block.color;
 }
 
+function applyCellColorVars(target, color) {
+  if (!target || !color) return;
+  target.style.setProperty("--cell-color", color);
+  const rgb = hexToRgbString(color);
+  if (rgb) {
+    target.style.setProperty("--cell-shadow-rgb", rgb);
+  }
+}
+
 function parseRgbTriplet(rgbString) {
   if (typeof rgbString !== "string") return null;
   const channels = rgbString.split(",").map((value) => Number.parseInt(value.trim(), 10));
@@ -2879,7 +2888,7 @@ function renderBoard() {
 
       if (top) {
         button.classList.add("filled");
-        button.style.setProperty("--cell-color", top);
+        applyCellColorVars(button, top);
       }
 
       const depth = cell.stack.length;
@@ -2934,7 +2943,7 @@ function createMiniGrid(block, options = {}) {
       const cellColor = cellColorByKey.get(`${shapeX},${shapeY}`);
       if (cellColor) {
         mini.classList.add("fill");
-        mini.style.setProperty("--cell-color", cellColor);
+        applyCellColorVars(mini, cellColor);
         if (attachShapeData) {
           mini.dataset.dx = String(shapeX);
           mini.dataset.dy = String(shapeY);

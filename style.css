@@ -151,7 +151,7 @@ body.danger-zone .danger-overlay {
     radial-gradient(circle at 50% 0%, rgba(145, 8, 22, calc(var(--danger-glow-alpha) * 0.5)), transparent 18%),
     radial-gradient(circle at 50% 100%, rgba(145, 8, 22, calc(var(--danger-glow-alpha) * 0.42)), transparent 18%);
   filter: blur(22px);
-  opacity: 0.74;
+  opacity: 0.82;
 }
 
 .danger-vignette::before {
@@ -167,7 +167,7 @@ body.danger-zone .danger-overlay {
     radial-gradient(circle at 0% 50%, rgba(152, 10, 25, calc(var(--danger-glow-alpha) * 0.38)), transparent 18%),
     radial-gradient(circle at 100% 50%, rgba(152, 10, 25, calc(var(--danger-glow-alpha) * 0.38)), transparent 18%);
   filter: blur(28px);
-  opacity: 0.56;
+  opacity: 0.64;
   animation: danger-light-orbit-alt 5200ms ease-in-out infinite;
 }
 
@@ -993,7 +993,7 @@ body.danger-zone .danger-overlay {
 .controls {
   margin-top: 14px;
   display: grid;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
   padding: 14px;
   border: 1px solid rgba(177, 141, 70, 0.18);
@@ -1146,20 +1146,89 @@ body.danger-zone .danger-overlay {
   cursor: not-allowed;
 }
 
-.message {
-  margin: 0;
-  min-height: 40px;
+.intro-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
   display: grid;
   place-items: center;
-  border-radius: 16px;
-  padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(177, 141, 70, 0.16);
-  color: #6b532d;
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.35;
+  padding: 18px;
+}
+
+.intro-backdrop {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 18%, rgba(255, 250, 235, 0.62), transparent 22%),
+    linear-gradient(180deg, rgba(92, 61, 11, 0.18), rgba(35, 21, 3, 0.42));
+  backdrop-filter: blur(10px);
+}
+
+.intro-panel {
+  position: relative;
+  z-index: 1;
+  width: min(420px, 100%);
+  display: grid;
+  gap: 14px;
   text-align: center;
+  padding: 28px 22px 24px;
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.74), transparent 36%),
+    linear-gradient(180deg, rgba(255, 251, 241, 0.98), rgba(247, 232, 189, 0.96));
+  box-shadow:
+    0 24px 44px rgba(84, 58, 8, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -18px 26px rgba(223, 190, 103, 0.24);
+}
+
+.intro-kicker {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  color: #a27424;
+}
+
+.intro-title {
+  margin: 0;
+  font-size: clamp(34px, 9vw, 48px);
+  line-height: 0.96;
+  color: #3a2b17;
+}
+
+.intro-copy {
+  margin: 0;
+  color: #6a5533;
+  font-size: 14px;
+  line-height: 1.6;
+  font-weight: 700;
+}
+
+.intro-start-btn {
+  justify-self: center;
+  min-width: 180px;
+  min-height: 54px;
+  padding: 0 24px;
+  border: none;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #f7c757, #dfa136);
+  color: #fffaf0;
+  font-size: 18px;
+  font-weight: 900;
+  box-shadow:
+    0 7px 0 #b9771d,
+    0 16px 24px rgba(178, 118, 20, 0.22);
+  cursor: pointer;
+  transition: transform 120ms ease, filter 120ms ease;
+}
+
+.intro-start-btn:active {
+  transform: translateY(2px);
+  box-shadow:
+    0 5px 0 #b9771d,
+    0 10px 16px rgba(178, 118, 20, 0.18);
 }
 
 .game-over-layer {
@@ -1931,8 +2000,12 @@ body.danger-zone .danger-overlay {
     padding-inline: 14px;
   }
 
-  .message {
-    min-height: 44px;
-    font-size: 12px;
+  .intro-panel {
+    padding: 24px 18px 20px;
+  }
+
+  .intro-start-btn {
+    width: 100%;
+    min-width: 0;
   }
 }

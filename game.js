@@ -125,7 +125,6 @@ const elements = {
   board: document.getElementById("board"),
   currentBlockView: document.getElementById("currentBlockView"),
   skipButton: document.getElementById("skipButton"),
-  message: document.getElementById("message"),
   gameOverLayer: document.getElementById("gameOverLayer"),
   endingBoardFx: document.getElementById("endingBoardFx"),
   endingCard: document.getElementById("endingCard"),
@@ -140,6 +139,8 @@ const elements = {
   soundSwitchState: document.getElementById("soundSwitchState"),
   bgmSwitchButton: document.getElementById("bgmSwitchButton"),
   bgmSwitchState: document.getElementById("bgmSwitchState"),
+  introModal: document.getElementById("introModal"),
+  introStartButton: document.getElementById("introStartButton"),
   profileButton: document.getElementById("profileButton"),
   profilePanel: document.getElementById("profilePanel"),
   playerIdInput: document.getElementById("playerIdInput"),
@@ -209,6 +210,7 @@ const state = {
   allClearGuaranteeActive: false,
   allClearAwardedThisRun: false,
   isResolving: false,
+  introOpen: true,
   settingsOpen: false,
   rankingOpen: false,
   playerId: initialPlayerId,
@@ -891,7 +893,7 @@ function stopBgmLoop() {
 }
 
 function syncBgmPlayback() {
-  const shouldPlay = audioState.bgmEnabled && !state.gameOver;
+  const shouldPlay = audioState.bgmEnabled && !state.gameOver && !state.introOpen;
   if (shouldPlay) {
     startBgmLoop();
   } else {
@@ -2134,6 +2136,14 @@ function runEndingContinue() {
   render();
 }
 
+function closeIntroModal() {
+  if (!state.introOpen) return;
+  state.introOpen = false;
+  ensureAudioContext();
+  syncBgmPlayback();
+  render();
+}
+
 function spawnCellBurstParticles(cells, burstIntensity = 1, color = null) {
   const unique = new Set(cells.map((cell) => `${cell.x},${cell.y}`));
   const cappedKeys = Array.from(unique).slice(0, 24 + burstIntensity * 8);
@@ -2737,7 +2747,7 @@ async function runPlacement(anchorX, anchorY) {
 }
 
 async function runSkip() {
-  if (state.gameOver || state.isResolving || state.isAdWatching) return;
+  if (state.gameOver || state.isResolving || state.isAdWatching || state.introOpen) return;
   endDragInteraction();
 
   if (!state.freeSkipUsed) {
@@ -2893,8 +2903,8 @@ function renderCollapseBar() {
 function updateDangerPresentation() {
   const active = !state.gameOver && state.collapse <= LOW_TURN_WARNING_THRESHOLD;
   document.body.classList.toggle("danger-zone", active);
-  document.documentElement.style.setProperty("--danger-screen-alpha", active ? "0.13" : "0");
-  document.documentElement.style.setProperty("--danger-glow-alpha", active ? "0.24" : "0");
+  document.documentElement.style.setProperty("--danger-screen-alpha", active ? "0.18" : "0");
+  document.documentElement.style.setProperty("--danger-glow-alpha", active ? "0.34" : "0");
 }
 
 function getCellFromPoint(clientX, clientY) {
@@ -3009,7 +3019,7 @@ function findNearestFilledMiniCell(clientX, clientY) {
 }
 
 function onDragStart(event) {
-  if (state.gameOver || state.isResolving || state.isAdWatching || !state.currentBlock) return;
+  if (state.gameOver || state.isResolving || state.isAdWatching || state.introOpen || !state.currentBlock) return;
   if (state.isDragging) return;
   if (event.pointerType === "mouse" && event.button !== 0) return;
   let grabbedCell = event.target.closest(".mini-cell.fill");
@@ -3032,7 +3042,6 @@ function onDragStart(event) {
   state.message = "보드 위 원하는 칸에 블록을 놓으세요.";
   state.dragGhostEl = createDragGhost(state.currentBlock, state.dragGhostMetrics);
   elements.currentBlockView.classList.add("is-dragging");
-  elements.message.textContent = state.message;
   const launchPoint = getBoardLaunchPoint();
   moveDragGhost(launchPoint.x, launchPoint.y);
   updateHoverCell(getAnchorFromPoint(launchPoint.x, launchPoint.y));
@@ -3136,13 +3145,15 @@ function render() {
   if (elements.endingScoreValue) {
     elements.endingScoreValue.textContent = String(state.score);
   }
-  elements.message.textContent = state.message;
   elements.skipButton.textContent = "SKIP";
   elements.skipButton.classList.toggle("needs-ad", state.freeSkipUsed);
   elements.skipButton.classList.remove("is-paid", "is-risky");
-  elements.skipButton.disabled = state.gameOver || state.isResolving || state.isAdWatching;
+  elements.skipButton.disabled = state.gameOver || state.isResolving || state.isAdWatching || state.introOpen;
   if (elements.endingContinueButton) {
     elements.endingContinueButton.disabled = state.endingSequenceRunning;
+  }
+  if (elements.introModal) {
+    elements.introModal.classList.toggle("hidden", !state.introOpen);
   }
   elements.gameOverLayer.classList.toggle("hidden", !state.gameOver);
   if (state.gameOver) {
@@ -3209,6 +3220,7 @@ function resetGame() {
 elements.skipButton.addEventListener("click", runSkip);
 elements.endingContinueButton.addEventListener("click", runEndingContinue);
 elements.endingNewGameButton.addEventListener("click", resetGame);
+elements.introStartButton.addEventListener("click", closeIntroModal);
 elements.currentBlockView.addEventListener("pointerdown", onDragStart);
 elements.rankingButton.addEventListener("click", openRankingModal);
 elements.settingsButton.addEventListener("click", openSettingsModal);

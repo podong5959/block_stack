@@ -80,13 +80,13 @@ const SCORE_TABLE = {
 };
 
 const BEST_SCORE_KEY = "block-stack-best-score-v1";
-const LAST_SCORE_KEY = "block-stack-last-score-v1";
 const GAMES_SINCE_ALL_CLEAR_KEY = "block-stack-games-since-all-clear-v1";
 const PLAYER_ID_KEY = "block-stack-player-id-v1";
 const LEADERBOARD_KEY = "block-stack-leaderboard-v1";
 const AUDIO_ENABLED_KEY = "block-stack-audio-enabled-v1";
 const BGM_ENABLED_KEY = "block-stack-bgm-enabled-v1";
 const TTS_SETTINGS_KEY = "block-stack-tts-settings-v1";
+const LEGACY_LAST_SCORE_KEY = "block-stack-last-score-v1";
 const LOGIN_INFO_KEY = "block-stack-login-info-v1";
 const ALL_CLEAR_GUARANTEE_GAP = 5;
 const BASE_TURN_COUNT = 15;
@@ -137,7 +137,6 @@ const DEFAULT_TTS_SETTINGS = {
 const elements = {
   scoreValue: document.getElementById("scoreValue"),
   bestScoreValue: document.getElementById("bestScoreValue"),
-  lastScoreValue: document.getElementById("lastScoreValue"),
   collapseValue: document.getElementById("collapseValue"),
   rankingButton: document.getElementById("rankingButton"),
   settingsButton: document.getElementById("settingsButton"),
@@ -231,7 +230,6 @@ const state = {
   boardCellEls: createBoardCellRefs(),
   score: 0,
   bestScore: getBestScore(),
-  lastScore: getLastScore(),
   collapse: BASE_TURN_COUNT,
   currentBlock: null,
   freeSkipUsed: false,
@@ -312,11 +310,6 @@ function getBestScore() {
   return Number.isFinite(saved) && saved > 0 ? saved : 0;
 }
 
-function getLastScore() {
-  const saved = Number(localStorage.getItem(LAST_SCORE_KEY));
-  return Number.isFinite(saved) && saved >= 0 ? Math.floor(saved) : 0;
-}
-
 function getGamesSinceAllClear() {
   const saved = Number(localStorage.getItem(GAMES_SINCE_ALL_CLEAR_KEY));
   return Number.isFinite(saved) && saved >= 0 ? Math.floor(saved) : 0;
@@ -331,13 +324,13 @@ function setBestScore(score) {
   localStorage.setItem(BEST_SCORE_KEY, String(score));
 }
 
-function setLastScore(score) {
-  localStorage.setItem(LAST_SCORE_KEY, String(Math.max(0, Math.floor(score))));
-}
-
 function getAudioEnabled() {
   const saved = localStorage.getItem(AUDIO_ENABLED_KEY);
   return saved !== "0";
+}
+
+function clearLegacyLastScoreStorage() {
+  localStorage.removeItem(LEGACY_LAST_SCORE_KEY);
 }
 
 function setAudioEnabled(enabled) {
@@ -3602,9 +3595,6 @@ function render() {
   if (elements.bestScoreValue) {
     elements.bestScoreValue.textContent = String(state.bestScore);
   }
-  if (elements.lastScoreValue) {
-    elements.lastScoreValue.textContent = String(state.lastScore);
-  }
   if (elements.collapseValue) {
     elements.collapseValue.textContent = String(state.collapse);
   }
@@ -3642,10 +3632,6 @@ function render() {
 }
 
 function resetGame() {
-  if (state.gameOver && state.score > 0) {
-    state.lastScore = state.score;
-    setLastScore(state.lastScore);
-  }
   commitRankingIfNeeded();
   stopTtsPlayback();
   endDragInteraction();
@@ -3756,4 +3742,5 @@ window.addEventListener("resize", () => {
 syncSettingsFields();
 syncRankingFields();
 syncBgmPlayback();
+clearLegacyLastScoreStorage();
 resetGame();

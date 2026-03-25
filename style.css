@@ -899,8 +899,8 @@ body.danger-zone .danger-overlay {
 
 .hud-top-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) auto;
-  align-items: start;
+  grid-template-columns: minmax(0, 1.3fr) minmax(116px, 0.82fr);
+  align-items: stretch;
   gap: 10px;
 }
 
@@ -916,10 +916,6 @@ body.danger-zone .danger-overlay {
   gap: 4px;
   min-height: 74px;
   place-items: center;
-}
-
-.last-chip {
-  justify-self: start;
 }
 
 .score-chip {
@@ -956,17 +952,13 @@ body.danger-zone .danger-overlay {
   line-height: 1;
 }
 
-.last-chip strong {
-  color: #52627e;
-}
-
 .score-chip strong {
   font-size: clamp(28px, 7vw, 38px);
   color: #4a5977;
 }
 
 .collapse-wrap {
-  min-width: 104px;
+  min-width: 116px;
   border: 1px solid rgba(242, 235, 226, 0.94);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 251, 247, 0.94));
   border-radius: 999px;
@@ -974,13 +966,15 @@ body.danger-zone .danger-overlay {
     inset 0 1px 0 rgba(255, 255, 255, 0.92),
     0 12px 24px rgba(217, 224, 234, 0.34);
   padding: 11px 12px;
-  justify-self: end;
+  display: grid;
+  place-items: center;
+  text-align: center;
 }
 
 .collapse-head {
   display: grid;
   gap: 4px;
-  justify-items: end;
+  justify-items: center;
   font-weight: 700;
 }
 
@@ -2246,7 +2240,7 @@ body.danger-zone .danger-overlay {
   }
 
   .hud-top-row {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(104px, 0.78fr);
     gap: 6px;
   }
 

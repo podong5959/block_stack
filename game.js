@@ -710,7 +710,16 @@ function commitRankingIfNeeded() {
 }
 
 function topColor(cell) {
-  return cell.stack.length > 0 ? cell.stack[cell.stack.length - 1] : null;
+  if (!cell || cell.stack.length === 0) return null;
+  const top = cell.stack[cell.stack.length - 1];
+  return typeof top === "string" ? top : top?.color || null;
+}
+
+function topFace(cell) {
+  if (!cell || cell.stack.length === 0) return null;
+  const top = cell.stack[cell.stack.length - 1];
+  if (typeof top === "string") return getFaceForSeed(top);
+  return top?.face || getFaceForSeed(top?.color || "");
 }
 
 function clampCollapse(value) {
@@ -1535,6 +1544,11 @@ function getBlockCellColor(block, index = 0) {
   return block.color;
 }
 
+function getBlockCellFace(block, index = 0) {
+  if (Array.isArray(block.faces) && block.faces[index]) return block.faces[index];
+  return getFaceForSeed(getBlockCellColor(block, index));
+}
+
 function applyCellColorVars(target, color) {
   if (!target || !color) return;
   target.style.setProperty("--cell-color", color);
@@ -1558,9 +1572,13 @@ function getFaceForSeed(seed) {
   return BLOCK_FACES[hash % BLOCK_FACES.length];
 }
 
+function createStackUnit(color, face = getFaceForSeed(color)) {
+  return { color, face };
+}
+
 function applyCellFace(target, seed) {
   if (!target) return;
-  target.dataset.face = getFaceForSeed(seed);
+  target.dataset.face = String(seed || getFaceForSeed(""));
 }
 
 function parseRgbTriplet(rgbString) {
@@ -1670,9 +1688,9 @@ function overwriteTopWithDifferentColor(cell, palette) {
   const current = topColor(cell);
   const next = chooseDifferentColor(palette, current);
   if (cell.stack.length === 0) {
-    cell.stack.push(next);
+    cell.stack.push(createStackUnit(next));
   } else {
-    cell.stack[cell.stack.length - 1] = next;
+    cell.stack[cell.stack.length - 1] = createStackUnit(next);
   }
 }
 
@@ -1692,7 +1710,7 @@ function createSeededBoard(difficulty = getDifficulty(state.score), score = stat
     const cell = board[y][x];
     const depth = randomStackDepth(difficulty);
     for (let i = 0; i < depth; i += 1) {
-      cell.stack.push(choose(palette));
+      cell.stack.push(createStackUnit(choose(palette)));
     }
   }
 
@@ -1719,9 +1737,11 @@ function generateBlock() {
   const size = weightedBlockSize();
   const shape = choose(SHAPES[size]);
   const colors = buildBlockColorLayout(shape);
+  const faces = colors.map((color) => getFaceForSeed(color));
   return {
     color: colors[0],
     colors,
+    faces,
     shape,
   };
 }
@@ -1752,7 +1772,7 @@ function placeBlock(block, anchorX, anchorY) {
     const [dx, dy] = block.shape[i];
     const x = anchorX + dx;
     const y = anchorY + dy;
-    state.board[y][x].stack.push(getBlockCellColor(block, i));
+    state.board[y][x].stack.push(createStackUnit(getBlockCellColor(block, i), getBlockCellFace(block, i)));
   }
 }
 
@@ -2909,7 +2929,7 @@ function renderBoard() {
       if (top) {
         button.classList.add("filled");
         applyCellColorVars(button, top);
-        applyCellFace(button, top);
+        applyCellFace(button, topFace(cell));
       }
 
       const depth = cell.stack.length;
@@ -2945,8 +2965,11 @@ function createMiniGrid(block, options = {}) {
   const offsetX = centerShape ? Math.floor((gridWidth - width) / 2) : 0;
   const offsetY = centerShape ? Math.floor((gridHeight - height) / 2) : 0;
 
-  const cellColorByKey = new Map(
-    block.shape.map(([x, y], index) => [`${x},${y}`, getBlockCellColor(block, index)])
+  const cellDataByKey = new Map(
+    block.shape.map(([x, y], index) => [
+      `${x},${y}`,
+      { color: getBlockCellColor(block, index), face: getBlockCellFace(block, index) },
+    ])
   );
   const grid = document.createElement("div");
   grid.className = "mini-grid";
@@ -2961,11 +2984,11 @@ function createMiniGrid(block, options = {}) {
       const shapeY = y - offsetY;
       const mini = document.createElement("div");
       mini.className = "mini-cell";
-      const cellColor = cellColorByKey.get(`${shapeX},${shapeY}`);
-      if (cellColor) {
+      const cellData = cellDataByKey.get(`${shapeX},${shapeY}`);
+      if (cellData) {
         mini.classList.add("fill");
-        applyCellColorVars(mini, cellColor);
-        applyCellFace(mini, cellColor);
+        applyCellColorVars(mini, cellData.color);
+        applyCellFace(mini, cellData.face);
         if (attachShapeData) {
           mini.dataset.dx = String(shapeX);
           mini.dataset.dy = String(shapeY);

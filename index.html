@@ -15,18 +15,13 @@
 <body>
   <main class="app-shell">
     <header class="hud">
-      <div class="hud-title-row">
-        <div class="title-copy">
-          <p class="app-kicker">BEST <strong id="bestScoreValue">0</strong></p>
-          <h1 class="app-title">Block Stack</h1>
-        </div>
-        <div class="hud-actions">
-          <button id="settingsButton" type="button" class="icon-btn settings-btn" aria-label="설정">&#9881;</button>
-        </div>
-      </div>
+      <button id="settingsButton" type="button" class="icon-btn settings-btn hud-settings-btn" aria-label="설정">&#9881;</button>
       <div class="hud-top-row">
         <div class="hud-chip score-chip">
-          <span class="label">점수</span>
+          <div class="score-chip-meta">
+            <span class="score-chip-label">현재 기록</span>
+            <span class="score-chip-best">BEST <strong id="bestScoreValue">0</strong></span>
+          </div>
           <strong id="scoreValue">0</strong>
         </div>
         <div class="collapse-wrap">

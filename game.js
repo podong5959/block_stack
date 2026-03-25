@@ -102,6 +102,7 @@ const LINKED_BLAST_MIN_DELAY_MS = 42;
 const COMBO_VOICE_COOLDOWN_MS = 700;
 const ENDING_FILL_DURATION_MS = 640;
 const ENDING_RISE_DURATION_MS = 980;
+const INTRO_EXIT_DURATION_MS = 520;
 const PREVIEW_GRID_SIZE = 5;
 const LOW_TURN_WARNING_THRESHOLD = 5;
 const BOARD_COLOR_FLASH_MIN_POPS = 15;
@@ -211,6 +212,7 @@ const state = {
   allClearAwardedThisRun: false,
   isResolving: false,
   introOpen: true,
+  introClosing: false,
   settingsOpen: false,
   rankingOpen: false,
   playerId: initialPlayerId,
@@ -225,6 +227,7 @@ const state = {
   rankingSavedThisGame: false,
   boardFlashTimeoutId: null,
   screenFlashTimeoutId: null,
+  introExitTimeoutId: null,
   message: "현재 블록을 드래그해서 보드에 놓으세요.",
 };
 
@@ -893,7 +896,7 @@ function stopBgmLoop() {
 }
 
 function syncBgmPlayback() {
-  const shouldPlay = audioState.bgmEnabled && !state.gameOver && !state.introOpen;
+  const shouldPlay = audioState.bgmEnabled && !state.gameOver && !state.introOpen && !state.introClosing;
   if (shouldPlay) {
     startBgmLoop();
   } else {
@@ -2137,11 +2140,20 @@ function runEndingContinue() {
 }
 
 function closeIntroModal() {
-  if (!state.introOpen) return;
-  state.introOpen = false;
+  if (!state.introOpen || state.introClosing) return;
   ensureAudioContext();
-  syncBgmPlayback();
+  state.introClosing = true;
   render();
+  if (state.introExitTimeoutId) {
+    window.clearTimeout(state.introExitTimeoutId);
+  }
+  state.introExitTimeoutId = window.setTimeout(() => {
+    state.introExitTimeoutId = null;
+    state.introClosing = false;
+    state.introOpen = false;
+    syncBgmPlayback();
+    render();
+  }, INTRO_EXIT_DURATION_MS);
 }
 
 function spawnCellBurstParticles(cells, burstIntensity = 1, color = null) {
@@ -2747,7 +2759,7 @@ async function runPlacement(anchorX, anchorY) {
 }
 
 async function runSkip() {
-  if (state.gameOver || state.isResolving || state.isAdWatching || state.introOpen) return;
+  if (state.gameOver || state.isResolving || state.isAdWatching || state.introOpen || state.introClosing) return;
   endDragInteraction();
 
   if (!state.freeSkipUsed) {
@@ -3019,7 +3031,7 @@ function findNearestFilledMiniCell(clientX, clientY) {
 }
 
 function onDragStart(event) {
-  if (state.gameOver || state.isResolving || state.isAdWatching || state.introOpen || !state.currentBlock) return;
+  if (state.gameOver || state.isResolving || state.isAdWatching || state.introOpen || state.introClosing || !state.currentBlock) return;
   if (state.isDragging) return;
   if (event.pointerType === "mouse" && event.button !== 0) return;
   let grabbedCell = event.target.closest(".mini-cell.fill");
@@ -3148,13 +3160,19 @@ function render() {
   elements.skipButton.textContent = "SKIP";
   elements.skipButton.classList.toggle("needs-ad", state.freeSkipUsed);
   elements.skipButton.classList.remove("is-paid", "is-risky");
-  elements.skipButton.disabled = state.gameOver || state.isResolving || state.isAdWatching || state.introOpen;
+  elements.skipButton.disabled = state.gameOver || state.isResolving || state.isAdWatching || state.introOpen || state.introClosing;
   if (elements.endingContinueButton) {
     elements.endingContinueButton.disabled = state.endingSequenceRunning;
   }
   if (elements.introModal) {
-    elements.introModal.classList.toggle("hidden", !state.introOpen);
+    elements.introModal.classList.toggle("hidden", !state.introOpen && !state.introClosing);
+    elements.introModal.classList.toggle("is-exiting", state.introClosing);
   }
+  if (elements.introStartButton) {
+    elements.introStartButton.disabled = state.introClosing;
+  }
+  document.body.classList.toggle("intro-open", state.introOpen || state.introClosing);
+  document.body.classList.toggle("intro-closing", state.introClosing);
   elements.gameOverLayer.classList.toggle("hidden", !state.gameOver);
   if (state.gameOver) {
     syncEndingBoardFxBounds();

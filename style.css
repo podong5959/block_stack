@@ -81,6 +81,10 @@ body.settings-open {
   overflow: hidden;
 }
 
+body.intro-open {
+  overflow: hidden;
+}
+
 .app-shell {
   position: relative;
   z-index: 1;
@@ -96,6 +100,19 @@ body.settings-open {
   padding: 18px 14px calc(18px + env(safe-area-inset-bottom));
   backdrop-filter: blur(8px);
   overflow: hidden;
+  transition: transform 520ms cubic-bezier(0.2, 0.8, 0.2, 1), filter 520ms ease, opacity 420ms ease;
+}
+
+body.intro-open .app-shell {
+  transform: scale(0.952);
+  filter: blur(12px);
+  opacity: 0.18;
+}
+
+body.intro-closing .app-shell {
+  transform: scale(1);
+  filter: blur(0);
+  opacity: 1;
 }
 
 .app-shell::before {
@@ -1150,76 +1167,112 @@ body.danger-zone .danger-overlay {
   position: fixed;
   inset: 0;
   z-index: 90;
-  display: grid;
-  place-items: center;
-  padding: 18px;
+  overflow: hidden;
+}
+
+.intro-modal.is-exiting {
+  pointer-events: none;
 }
 
 .intro-backdrop {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at 50% 18%, rgba(255, 250, 235, 0.62), transparent 22%),
-    linear-gradient(180deg, rgba(92, 61, 11, 0.18), rgba(35, 21, 3, 0.42));
-  backdrop-filter: blur(10px);
+    radial-gradient(circle at 50% 12%, rgba(255, 252, 240, 0.92), transparent 24%),
+    radial-gradient(circle at 18% 82%, rgba(255, 177, 78, 0.14), transparent 24%),
+    radial-gradient(circle at 82% 84%, rgba(255, 177, 78, 0.12), transparent 22%),
+    linear-gradient(180deg, rgba(255, 246, 223, 0.8), rgba(224, 186, 104, 0.3) 46%, rgba(63, 35, 4, 0.56));
+  backdrop-filter: blur(14px);
+  transition: opacity 220ms ease;
 }
 
 .intro-panel {
   position: relative;
   z-index: 1;
-  width: min(420px, 100%);
+  width: 100%;
+  min-height: 100dvh;
   display: grid;
-  gap: 14px;
-  text-align: center;
-  padding: 28px 22px 24px;
-  border-radius: 28px;
-  border: 1px solid rgba(255, 255, 255, 0.82);
+  grid-template-rows: minmax(0, 1fr) auto;
+  padding:
+    max(34px, env(safe-area-inset-top))
+    22px
+    max(22px, env(safe-area-inset-bottom))
+    22px;
+}
+
+.intro-panel::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: clamp(68px, 14vh, 132px);
+  width: min(540px, calc(100vw - 34px));
+  height: min(54vh, 480px);
+  transform: translateX(-50%);
+  border-radius: 36px;
+  border: 1px solid rgba(255, 255, 255, 0.48);
   background:
-    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.74), transparent 36%),
-    linear-gradient(180deg, rgba(255, 251, 241, 0.98), rgba(247, 232, 189, 0.96));
+    radial-gradient(circle at 50% 12%, rgba(255, 255, 255, 0.92), transparent 32%),
+    linear-gradient(180deg, rgba(255, 250, 238, 0.84), rgba(243, 225, 177, 0.5));
   box-shadow:
-    0 24px 44px rgba(84, 58, 8, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    inset 0 -18px 26px rgba(223, 190, 103, 0.24);
+    0 30px 64px rgba(92, 60, 6, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.86);
+}
+
+.intro-panel-copy {
+  position: relative;
+  z-index: 1;
+  width: min(480px, 100%);
+  margin: 0 auto;
+  align-self: center;
+  display: grid;
+  gap: 16px;
+  text-align: center;
+  padding-top: min(8vh, 64px);
 }
 
 .intro-kicker {
   margin: 0;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 800;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.24em;
   color: #a27424;
 }
 
 .intro-title {
   margin: 0;
-  font-size: clamp(34px, 9vw, 48px);
-  line-height: 0.96;
+  font-size: clamp(54px, 15vw, 104px);
+  line-height: 0.9;
   color: #3a2b17;
+  text-shadow: 0 10px 24px rgba(255, 245, 214, 0.38);
 }
 
 .intro-copy {
   margin: 0;
-  color: #6a5533;
-  font-size: 14px;
+  width: min(340px, 100%);
+  justify-self: center;
+  color: #6d5937;
+  font-size: clamp(15px, 4vw, 18px);
   line-height: 1.6;
   font-weight: 700;
 }
 
 .intro-start-btn {
+  position: relative;
+  z-index: 1;
   justify-self: center;
-  min-width: 180px;
-  min-height: 54px;
-  padding: 0 24px;
+  width: min(480px, 100%);
+  min-height: 68px;
+  padding: 0 26px;
   border: none;
-  border-radius: 18px;
+  border-radius: 24px;
   background: linear-gradient(180deg, #f7c757, #dfa136);
   color: #fffaf0;
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 900;
+  letter-spacing: 0.01em;
   box-shadow:
-    0 7px 0 #b9771d,
-    0 16px 24px rgba(178, 118, 20, 0.22);
+    0 8px 0 #b9771d,
+    0 22px 30px rgba(178, 118, 20, 0.24);
   cursor: pointer;
   transition: transform 120ms ease, filter 120ms ease;
 }
@@ -1227,8 +1280,29 @@ body.danger-zone .danger-overlay {
 .intro-start-btn:active {
   transform: translateY(2px);
   box-shadow:
-    0 5px 0 #b9771d,
-    0 10px 16px rgba(178, 118, 20, 0.18);
+    0 6px 0 #b9771d,
+    0 12px 18px rgba(178, 118, 20, 0.18);
+}
+
+.intro-start-btn:disabled {
+  cursor: default;
+  filter: saturate(0.92);
+}
+
+.intro-modal.is-exiting .intro-backdrop {
+  animation: intro-backdrop-leave 520ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+.intro-modal.is-exiting .intro-panel::before {
+  animation: intro-surface-leave 520ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+.intro-modal.is-exiting .intro-panel-copy {
+  animation: intro-copy-leave 420ms cubic-bezier(0.32, 0, 0.22, 1) forwards;
+}
+
+.intro-modal.is-exiting .intro-start-btn {
+  animation: intro-button-leave 380ms cubic-bezier(0.32, 0, 0.22, 1) forwards;
 }
 
 .game-over-layer {
@@ -1948,6 +2022,50 @@ body.danger-zone .danger-overlay {
   }
 }
 
+@keyframes intro-backdrop-leave {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes intro-surface-leave {
+  0% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) scale(1.04);
+    filter: blur(10px);
+  }
+}
+
+@keyframes intro-copy-leave {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-28px) scale(0.98);
+  }
+}
+
+@keyframes intro-button-leave {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(22px) scale(0.96);
+  }
+}
+
 @media (max-width: 520px) {
   .app-shell {
     border-radius: 24px;
@@ -2001,11 +2119,25 @@ body.danger-zone .danger-overlay {
   }
 
   .intro-panel {
-    padding: 24px 18px 20px;
+    padding:
+      max(26px, env(safe-area-inset-top))
+      18px
+      max(18px, env(safe-area-inset-bottom))
+      18px;
+  }
+
+  .intro-panel::before {
+    width: calc(100vw - 28px);
+    top: clamp(54px, 12vh, 112px);
+    height: min(52vh, 420px);
+  }
+
+  .intro-panel-copy {
+    padding-top: min(6vh, 40px);
   }
 
   .intro-start-btn {
+    min-height: 62px;
     width: 100%;
-    min-width: 0;
   }
 }

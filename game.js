@@ -512,7 +512,7 @@ function renderMyRankView() {
 }
 
 function updateModalBodyLock() {
-  document.body.classList.toggle("settings-open", state.settingsOpen || state.rankingOpen || state.isAdWatching);
+  document.body.classList.toggle("settings-open", state.settingsOpen || state.isAdWatching);
 }
 
 function renderSwitchButton(button, stateEl, enabled) {
@@ -560,10 +560,6 @@ function renderRankingViewState() {
 function syncSettingsFields() {
   renderSwitchButton(elements.soundSwitchButton, elements.soundSwitchState, audioState.enabled);
   renderSwitchButton(elements.bgmSwitchButton, elements.bgmSwitchState, audioState.bgmEnabled);
-  if (elements.loginInfoValue) {
-    elements.loginInfoValue.textContent = state.loginInfo;
-  }
-  renderProfileState();
 }
 
 function syncRankingFields() {
@@ -698,15 +694,7 @@ function clearLeaderboardRecords() {
 }
 
 function commitRankingIfNeeded() {
-  if (state.rankingSavedThisGame) return;
-  if (!state.gameOver) return;
-  if (!Number.isFinite(state.score) || state.score <= 0) {
-    state.rankingSavedThisGame = true;
-    return;
-  }
-  addScoreToLeaderboard(state.runPlayerId, state.score);
-  state.rankingSavedThisGame = true;
-  syncRankingFields();
+  return;
 }
 
 function topColor(cell) {
@@ -3304,9 +3292,6 @@ function render() {
   renderCollapseBar();
   renderBoard();
   renderBlockView(elements.currentBlockView, state.currentBlock, { draggable: true });
-  if (state.rankingOpen) {
-    syncRankingFields();
-  }
 }
 
 function resetGame() {
@@ -3363,26 +3348,11 @@ elements.endingContinueButton.addEventListener("click", runEndingContinue);
 elements.endingNewGameButton.addEventListener("click", resetGame);
 elements.introStartButton.addEventListener("click", closeIntroModal);
 elements.currentBlockView.addEventListener("pointerdown", onDragStart);
-elements.rankingButton.addEventListener("click", openRankingModal);
 elements.settingsButton.addEventListener("click", openSettingsModal);
 elements.settingsCloseButton.addEventListener("click", closeSettingsModal);
 elements.settingsBackdrop.addEventListener("click", closeSettingsModal);
 elements.soundSwitchButton.addEventListener("click", toggleSoundEnabled);
 elements.bgmSwitchButton.addEventListener("click", toggleBgmEnabled);
-elements.profileButton.addEventListener("click", toggleProfilePanel);
-elements.editPlayerIdButton.addEventListener("click", enablePlayerIdEdit);
-elements.savePlayerIdButton.addEventListener("click", savePlayerIdFromInput);
-elements.linkAccountButton.addEventListener("click", toggleAccountProvidersInfo);
-elements.playerIdInput.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") {
-    event.preventDefault();
-    savePlayerIdFromInput();
-  }
-});
-elements.rankingCloseButton.addEventListener("click", closeRankingModal);
-elements.rankingBackdrop.addEventListener("click", closeRankingModal);
-elements.myRankTabButton.addEventListener("click", () => setRankingView("mine"));
-elements.top10TabButton.addEventListener("click", () => setRankingView("top10"));
 window.addEventListener("pointermove", onDragMove);
 window.addEventListener("pointerup", onDragEnd);
 window.addEventListener("pointercancel", onDragCancel);

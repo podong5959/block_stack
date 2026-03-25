@@ -86,6 +86,7 @@ const PLAYER_ID_KEY = "block-stack-player-id-v1";
 const LEADERBOARD_KEY = "block-stack-leaderboard-v1";
 const AUDIO_ENABLED_KEY = "block-stack-audio-enabled-v1";
 const BGM_ENABLED_KEY = "block-stack-bgm-enabled-v1";
+const TTS_SETTINGS_KEY = "block-stack-tts-settings-v1";
 const LOGIN_INFO_KEY = "block-stack-login-info-v1";
 const ALL_CLEAR_GUARANTEE_GAP = 5;
 const BASE_TURN_COUNT = 15;
@@ -116,6 +117,22 @@ const BGM_GAIN_MULTIPLIER = 1.8;
 const SKIP_REROLL_MAX_ATTEMPTS = 12;
 const AD_SKELETON_WATCH_MS = 2100;
 const AD_SKELETON_STEP_MS = 90;
+const TTS_COOLDOWN_MS = 680;
+const TTS_TEXT_LIMIT = 18;
+
+const DEFAULT_TTS_SETTINGS = {
+  enabled: true,
+  threshold: 14,
+  rate: 1.04,
+  pitch: 1.18,
+  volume: 0.96,
+  phrases: {
+    good: "굿!!",
+    great: "나이스!!",
+    mega: "와우!!",
+    allClear: "올 클리어!!",
+  },
+};
 
 const elements = {
   scoreValue: document.getElementById("scoreValue"),
@@ -143,6 +160,25 @@ const elements = {
   soundSwitchState: document.getElementById("soundSwitchState"),
   bgmSwitchButton: document.getElementById("bgmSwitchButton"),
   bgmSwitchState: document.getElementById("bgmSwitchState"),
+  ttsSwitchButton: document.getElementById("ttsSwitchButton"),
+  ttsSwitchState: document.getElementById("ttsSwitchState"),
+  ttsAdminPanel: document.getElementById("ttsAdminPanel"),
+  ttsThresholdInput: document.getElementById("ttsThresholdInput"),
+  ttsThresholdValue: document.getElementById("ttsThresholdValue"),
+  ttsRateInput: document.getElementById("ttsRateInput"),
+  ttsRateValue: document.getElementById("ttsRateValue"),
+  ttsPitchInput: document.getElementById("ttsPitchInput"),
+  ttsPitchValue: document.getElementById("ttsPitchValue"),
+  ttsVolumeInput: document.getElementById("ttsVolumeInput"),
+  ttsVolumeValue: document.getElementById("ttsVolumeValue"),
+  ttsPhraseGoodInput: document.getElementById("ttsPhraseGoodInput"),
+  ttsPhraseGreatInput: document.getElementById("ttsPhraseGreatInput"),
+  ttsPhraseMegaInput: document.getElementById("ttsPhraseMegaInput"),
+  ttsPhraseAllClearInput: document.getElementById("ttsPhraseAllClearInput"),
+  ttsTestGoodButton: document.getElementById("ttsTestGoodButton"),
+  ttsTestMegaButton: document.getElementById("ttsTestMegaButton"),
+  ttsTestAllClearButton: document.getElementById("ttsTestAllClearButton"),
+  ttsAdminHint: document.getElementById("ttsAdminHint"),
   introModal: document.getElementById("introModal"),
   introStartButton: document.getElementById("introStartButton"),
   profileButton: document.getElementById("profileButton"),
@@ -179,6 +215,13 @@ const audioState = {
   bgmStep: 0,
   noiseBuffer: null,
   noiseBufferSampleRate: 0,
+};
+
+const ttsState = {
+  supported: isTtsSupported(),
+  voice: null,
+  lastSpokenAt: 0,
+  ...getTtsSettings(),
 };
 
 const initialPlayerId = getPlayerId();
@@ -308,6 +351,114 @@ function getBgmEnabled() {
 
 function setBgmEnabled(enabled) {
   localStorage.setItem(BGM_ENABLED_KEY, enabled ? "1" : "0");
+}
+
+function isTtsSupported() {
+  return typeof window !== "undefined"
+    && typeof window.speechSynthesis !== "undefined"
+    && typeof window.SpeechSynthesisUtterance !== "undefined";
+}
+
+function cloneDefaultTtsSettings() {
+  return {
+    enabled: DEFAULT_TTS_SETTINGS.enabled,
+    threshold: DEFAULT_TTS_SETTINGS.threshold,
+    rate: DEFAULT_TTS_SETTINGS.rate,
+    pitch: DEFAULT_TTS_SETTINGS.pitch,
+    volume: DEFAULT_TTS_SETTINGS.volume,
+    phrases: { ...DEFAULT_TTS_SETTINGS.phrases },
+  };
+}
+
+function clampNumber(value, min, max, fallback) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, parsed));
+}
+
+function sanitizeTtsText(value, fallback = "") {
+  const compact = String(value ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, TTS_TEXT_LIMIT);
+  return compact || fallback;
+}
+
+function normalizeTtsSettings(rawValue) {
+  const base = cloneDefaultTtsSettings();
+  const raw = rawValue && typeof rawValue === "object" ? rawValue : {};
+  const rawPhrases = raw.phrases && typeof raw.phrases === "object" ? raw.phrases : {};
+  return {
+    enabled: raw.enabled !== false,
+    threshold: Math.round(clampNumber(raw.threshold, 8, 24, base.threshold)),
+    rate: Number(clampNumber(raw.rate, 0.8, 1.35, base.rate).toFixed(2)),
+    pitch: Number(clampNumber(raw.pitch, 0.8, 1.6, base.pitch).toFixed(2)),
+    volume: Number(clampNumber(raw.volume, 0.4, 1, base.volume).toFixed(2)),
+    phrases: {
+      good: sanitizeTtsText(rawPhrases.good, base.phrases.good),
+      great: sanitizeTtsText(rawPhrases.great, base.phrases.great),
+      mega: sanitizeTtsText(rawPhrases.mega, base.phrases.mega),
+      allClear: sanitizeTtsText(rawPhrases.allClear, base.phrases.allClear),
+    },
+  };
+}
+
+function getTtsSettings() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(TTS_SETTINGS_KEY) || "null");
+    return normalizeTtsSettings(raw);
+  } catch (_error) {
+    return cloneDefaultTtsSettings();
+  }
+}
+
+function persistTtsSettings() {
+  const safe = normalizeTtsSettings(ttsState);
+  localStorage.setItem(TTS_SETTINGS_KEY, JSON.stringify(safe));
+}
+
+function setTtsEnabled(enabled) {
+  ttsState.enabled = !!enabled;
+  persistTtsSettings();
+}
+
+function stopTtsPlayback() {
+  if (!ttsState.supported) return;
+  window.speechSynthesis.cancel();
+}
+
+function pickPreferredTtsVoice() {
+  if (!ttsState.supported) return null;
+  const voices = window.speechSynthesis.getVoices();
+  if (!Array.isArray(voices) || voices.length === 0) return null;
+  return voices.find((voice) => voice.lang === "ko-KR")
+    || voices.find((voice) => /^ko\b/i.test(voice.lang))
+    || voices.find((voice) => voice.default)
+    || voices[0]
+    || null;
+}
+
+function syncTtsVoice() {
+  ttsState.voice = pickPreferredTtsVoice();
+}
+
+function formatTtsScalar(value) {
+  return `${Number(value).toFixed(2)}x`;
+}
+
+function updateTtsSetting(key, value) {
+  if (!(key in ttsState)) return;
+  const normalized = normalizeTtsSettings({ ...ttsState, [key]: value });
+  ttsState[key] = normalized[key];
+  persistTtsSettings();
+  syncSettingsFields();
+}
+
+function updateTtsPhrase(key, value) {
+  if (!(key in DEFAULT_TTS_SETTINGS.phrases)) return;
+  ttsState.phrases[key] = sanitizeTtsText(value, DEFAULT_TTS_SETTINGS.phrases[key]);
+  persistTtsSettings();
+  syncSettingsFields();
 }
 
 function getLoginInfo() {
@@ -523,6 +674,81 @@ function renderSwitchButton(button, stateEl, enabled) {
   stateEl.textContent = enabled ? "ON" : "OFF";
 }
 
+function syncTtsFields() {
+  const supported = ttsState.supported;
+  const enabled = supported && ttsState.enabled;
+  renderSwitchButton(elements.ttsSwitchButton, elements.ttsSwitchState, enabled);
+
+  if (elements.ttsSwitchButton) {
+    elements.ttsSwitchButton.disabled = !supported;
+  }
+  if (elements.ttsSwitchState && !supported) {
+    elements.ttsSwitchState.textContent = "N/A";
+  }
+
+  if (elements.ttsThresholdInput) {
+    elements.ttsThresholdInput.value = String(ttsState.threshold);
+    elements.ttsThresholdInput.disabled = !supported;
+  }
+  if (elements.ttsThresholdValue) {
+    elements.ttsThresholdValue.textContent = `${ttsState.threshold}칸+`;
+  }
+
+  if (elements.ttsRateInput) {
+    elements.ttsRateInput.value = String(ttsState.rate);
+    elements.ttsRateInput.disabled = !supported;
+  }
+  if (elements.ttsRateValue) {
+    elements.ttsRateValue.textContent = formatTtsScalar(ttsState.rate);
+  }
+
+  if (elements.ttsPitchInput) {
+    elements.ttsPitchInput.value = String(ttsState.pitch);
+    elements.ttsPitchInput.disabled = !supported;
+  }
+  if (elements.ttsPitchValue) {
+    elements.ttsPitchValue.textContent = formatTtsScalar(ttsState.pitch);
+  }
+
+  if (elements.ttsVolumeInput) {
+    elements.ttsVolumeInput.value = String(ttsState.volume);
+    elements.ttsVolumeInput.disabled = !supported;
+  }
+  if (elements.ttsVolumeValue) {
+    elements.ttsVolumeValue.textContent = formatTtsScalar(ttsState.volume);
+  }
+
+  const phraseFields = [
+    [elements.ttsPhraseGoodInput, ttsState.phrases.good],
+    [elements.ttsPhraseGreatInput, ttsState.phrases.great],
+    [elements.ttsPhraseMegaInput, ttsState.phrases.mega],
+    [elements.ttsPhraseAllClearInput, ttsState.phrases.allClear],
+  ];
+  for (const [field, value] of phraseFields) {
+    if (!field) continue;
+    if (field.value !== value) field.value = value;
+    field.disabled = !supported;
+  }
+
+  const previewDisabled = !supported || !ttsState.enabled || !audioState.enabled;
+  for (const button of [
+    elements.ttsTestGoodButton,
+    elements.ttsTestMegaButton,
+    elements.ttsTestAllClearButton,
+  ]) {
+    if (!button) continue;
+    button.disabled = previewDisabled;
+  }
+
+  if (elements.ttsAdminHint) {
+    elements.ttsAdminHint.textContent = !supported
+      ? "이 브라우저에서는 내장 TTS를 사용할 수 없습니다."
+      : !audioState.enabled
+        ? "효과음이 꺼져 있어 TTS도 재생되지 않습니다."
+        : "효과음 OFF 시 TTS도 함께 멈춥니다. 기기 음성에 따라 발음은 달라질 수 있습니다.";
+  }
+}
+
 function renderProfileState() {
   if (elements.profilePanel) {
     elements.profilePanel.classList.toggle("hidden", !state.profileOpen);
@@ -560,6 +786,7 @@ function renderRankingViewState() {
 function syncSettingsFields() {
   renderSwitchButton(elements.soundSwitchButton, elements.soundSwitchState, audioState.enabled);
   renderSwitchButton(elements.bgmSwitchButton, elements.bgmSwitchState, audioState.bgmEnabled);
+  syncTtsFields();
 }
 
 function syncRankingFields() {
@@ -665,6 +892,9 @@ function toggleSoundEnabled() {
   setAudioEnabled(audioState.enabled);
   if (audioState.enabled) {
     ensureAudioContext({ force: true });
+    syncTtsVoice();
+  } else {
+    stopTtsPlayback();
   }
   if (!audioState.enabled && !audioState.bgmEnabled && audioState.ctx && audioState.ctx.state !== "closed") {
     audioState.ctx.suspend().catch(() => {
@@ -682,6 +912,112 @@ function toggleBgmEnabled() {
   }
   syncBgmPlayback();
   syncSettingsFields();
+}
+
+function toggleTtsEnabled() {
+  if (!ttsState.supported) return;
+  setTtsEnabled(!ttsState.enabled);
+  if (ttsState.enabled) {
+    syncTtsVoice();
+  } else {
+    stopTtsPlayback();
+  }
+  syncSettingsFields();
+}
+
+function speakArcadeTts(text, options = {}) {
+  if (!ttsState.supported || !ttsState.enabled || !audioState.enabled) return false;
+  const phrase = sanitizeTtsText(text, "");
+  if (!phrase) return false;
+
+  const synth = window.speechSynthesis;
+  const now = Date.now();
+  const cooldownMs = Number.isFinite(options.cooldownMs) ? options.cooldownMs : TTS_COOLDOWN_MS;
+  if (!options.force && now - ttsState.lastSpokenAt < cooldownMs) return false;
+
+  if (!ttsState.voice) {
+    syncTtsVoice();
+  }
+  if (options.interrupt && (synth.speaking || synth.pending)) {
+    synth.cancel();
+  } else if (synth.speaking || synth.pending) {
+    return false;
+  }
+
+  const utterance = new SpeechSynthesisUtterance(phrase);
+  if (ttsState.voice) {
+    utterance.voice = ttsState.voice;
+    utterance.lang = ttsState.voice.lang || "ko-KR";
+  } else {
+    utterance.lang = "ko-KR";
+  }
+  utterance.rate = Math.min(1.45, Math.max(0.7, options.rate ?? ttsState.rate));
+  utterance.pitch = Math.min(1.8, Math.max(0.6, options.pitch ?? ttsState.pitch));
+  utterance.volume = Math.min(1, Math.max(0, options.volume ?? ttsState.volume));
+  ttsState.lastSpokenAt = now;
+  synth.speak(utterance);
+  return true;
+}
+
+function getTurnTtsCue({ poppedBlocks = 0, turnLineCount = 0, chainDepth = 1, allClearTriggered = false } = {}) {
+  if (allClearTriggered) {
+    return {
+      text: ttsState.phrases.allClear,
+      interrupt: true,
+      force: true,
+      rate: Math.max(0.86, ttsState.rate * 0.94),
+      pitch: Math.min(1.55, ttsState.pitch * 0.98),
+      volume: Math.min(1, ttsState.volume),
+    };
+  }
+
+  const threshold = ttsState.threshold;
+  if (poppedBlocks >= threshold + 10 || chainDepth >= 4 || turnLineCount >= 4) {
+    return {
+      text: ttsState.phrases.mega,
+      interrupt: true,
+      rate: Math.min(1.32, ttsState.rate * 1.04),
+      pitch: Math.min(1.62, ttsState.pitch * 1.06),
+      volume: Math.min(1, ttsState.volume),
+    };
+  }
+
+  if (poppedBlocks >= threshold + 4 || chainDepth >= 3 || turnLineCount >= 3) {
+    return {
+      text: ttsState.phrases.great,
+      rate: Math.min(1.28, ttsState.rate * 1.02),
+      pitch: Math.min(1.54, ttsState.pitch * 1.02),
+      volume: Math.min(1, ttsState.volume),
+    };
+  }
+
+  if (poppedBlocks >= threshold || chainDepth >= 2 || turnLineCount >= 2) {
+    return {
+      text: ttsState.phrases.good,
+      rate: ttsState.rate,
+      pitch: ttsState.pitch,
+      volume: ttsState.volume,
+    };
+  }
+
+  return null;
+}
+
+function previewTtsCue(kind) {
+  if (!ttsState.supported) return;
+  const text = kind === "allClear"
+    ? ttsState.phrases.allClear
+    : kind === "mega"
+      ? ttsState.phrases.mega
+      : ttsState.phrases.good;
+  speakArcadeTts(text, {
+    interrupt: true,
+    force: true,
+    cooldownMs: 0,
+    rate: kind === "allClear" ? Math.max(0.86, ttsState.rate * 0.94) : ttsState.rate,
+    pitch: kind === "mega" ? Math.min(1.62, ttsState.pitch * 1.06) : ttsState.pitch,
+    volume: ttsState.volume,
+  });
 }
 
 function clearLeaderboardRecords() {
@@ -2245,6 +2581,7 @@ function runEndingContinue() {
 function closeIntroModal() {
   if (!state.introOpen || state.introClosing) return;
   ensureAudioContext();
+  syncTtsVoice();
   state.introClosing = true;
   render();
   if (state.introExitTimeoutId) {
@@ -2518,6 +2855,7 @@ function setGameOver(reason) {
   endDragInteraction();
   state.gameOver = true;
   state.message = reason;
+  stopTtsPlayback();
   syncBgmPlayback();
   playGameOverSound();
   if (state.continueUsedThisGame) {
@@ -2820,6 +3158,15 @@ async function runPlacement(anchorX, anchorY) {
         playComboVoiceCue("와아아우~~~~", { rate: 0.86, pitch: 0.78, volume: 0.92 });
         playDopamineClearSound({ lines: Math.max(2, turnLineCount), chain: Math.max(2, depth - 1) });
         triggerBoardGlitter(Math.min(5, 3 + Math.floor(turnLineCount / 2)));
+      }
+      const turnTtsCue = getTurnTtsCue({
+        poppedBlocks,
+        turnLineCount,
+        chainDepth: Math.max(1, depth - 1),
+        allClearTriggered,
+      });
+      if (turnTtsCue) {
+        speakArcadeTts(turnTtsCue.text, turnTtsCue);
       }
       if (allClearTriggered) {
         const base = allClearGuaranteed
@@ -3300,6 +3647,7 @@ function resetGame() {
     setLastScore(state.lastScore);
   }
   commitRankingIfNeeded();
+  stopTtsPlayback();
   endDragInteraction();
   closeAdWatchModal();
   clearAmbientTheme();
@@ -3353,10 +3701,52 @@ elements.settingsCloseButton.addEventListener("click", closeSettingsModal);
 elements.settingsBackdrop.addEventListener("click", closeSettingsModal);
 elements.soundSwitchButton.addEventListener("click", toggleSoundEnabled);
 elements.bgmSwitchButton.addEventListener("click", toggleBgmEnabled);
+elements.ttsSwitchButton.addEventListener("click", toggleTtsEnabled);
+elements.ttsThresholdInput.addEventListener("input", (event) => {
+  updateTtsSetting("threshold", event.currentTarget.value);
+});
+elements.ttsRateInput.addEventListener("input", (event) => {
+  updateTtsSetting("rate", event.currentTarget.value);
+});
+elements.ttsPitchInput.addEventListener("input", (event) => {
+  updateTtsSetting("pitch", event.currentTarget.value);
+});
+elements.ttsVolumeInput.addEventListener("input", (event) => {
+  updateTtsSetting("volume", event.currentTarget.value);
+});
+elements.ttsPhraseGoodInput.addEventListener("input", (event) => {
+  updateTtsPhrase("good", event.currentTarget.value);
+});
+elements.ttsPhraseGreatInput.addEventListener("input", (event) => {
+  updateTtsPhrase("great", event.currentTarget.value);
+});
+elements.ttsPhraseMegaInput.addEventListener("input", (event) => {
+  updateTtsPhrase("mega", event.currentTarget.value);
+});
+elements.ttsPhraseAllClearInput.addEventListener("input", (event) => {
+  updateTtsPhrase("allClear", event.currentTarget.value);
+});
+elements.ttsTestGoodButton.addEventListener("click", () => {
+  previewTtsCue("good");
+});
+elements.ttsTestMegaButton.addEventListener("click", () => {
+  previewTtsCue("mega");
+});
+elements.ttsTestAllClearButton.addEventListener("click", () => {
+  previewTtsCue("allClear");
+});
 window.addEventListener("pointermove", onDragMove);
 window.addEventListener("pointerup", onDragEnd);
 window.addEventListener("pointercancel", onDragCancel);
 window.addEventListener("keydown", onWindowKeyDown);
+if (ttsState.supported) {
+  if (typeof window.speechSynthesis.addEventListener === "function") {
+    window.speechSynthesis.addEventListener("voiceschanged", syncTtsVoice);
+  } else {
+    window.speechSynthesis.onvoiceschanged = syncTtsVoice;
+  }
+  syncTtsVoice();
+}
 window.addEventListener("resize", () => {
   if (state.gameOver) {
     syncEndingBoardFxBounds();

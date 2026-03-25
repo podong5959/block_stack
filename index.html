@@ -112,6 +112,84 @@
           <strong id="bgmSwitchState" class="switch-state">ON</strong>
         </button>
       </section>
+
+      <section class="settings-section">
+        <div class="settings-section-head">
+          <div>
+            <h3>TTS 어드민</h3>
+            <p class="settings-sub">큰 폭발 구간에서만 짧게 콜아웃하는 브라우저 내장 보이스입니다.</p>
+          </div>
+        </div>
+
+        <button id="ttsSwitchButton" type="button" class="switch-btn">
+          <span class="switch-label">보이스 TTS</span>
+          <span class="switch-pill"><span class="switch-dot"></span></span>
+          <strong id="ttsSwitchState" class="switch-state">ON</strong>
+        </button>
+
+        <div id="ttsAdminPanel" class="tts-admin-panel">
+          <label class="tts-control" for="ttsThresholdInput">
+            <span class="tts-control-top">
+              <strong>발동 기준</strong>
+              <span id="ttsThresholdValue" class="tts-value">14칸+</span>
+            </span>
+            <input id="ttsThresholdInput" type="range" min="8" max="24" step="1" />
+          </label>
+
+          <div class="tts-grid">
+            <label class="tts-control" for="ttsRateInput">
+              <span class="tts-control-top">
+                <strong>속도</strong>
+                <span id="ttsRateValue" class="tts-value">1.04x</span>
+              </span>
+              <input id="ttsRateInput" type="range" min="0.8" max="1.35" step="0.01" />
+            </label>
+
+            <label class="tts-control" for="ttsPitchInput">
+              <span class="tts-control-top">
+                <strong>톤</strong>
+                <span id="ttsPitchValue" class="tts-value">1.18x</span>
+              </span>
+              <input id="ttsPitchInput" type="range" min="0.8" max="1.6" step="0.01" />
+            </label>
+          </div>
+
+          <label class="tts-control" for="ttsVolumeInput">
+            <span class="tts-control-top">
+              <strong>볼륨</strong>
+              <span id="ttsVolumeValue" class="tts-value">0.96x</span>
+            </span>
+            <input id="ttsVolumeInput" type="range" min="0.4" max="1" step="0.01" />
+          </label>
+
+          <div class="tts-phrase-grid">
+            <label class="tts-text-field" for="ttsPhraseGoodInput">
+              <span>기본 폭발</span>
+              <input id="ttsPhraseGoodInput" type="text" maxlength="18" placeholder="굿!!" />
+            </label>
+            <label class="tts-text-field" for="ttsPhraseGreatInput">
+              <span>강한 연쇄</span>
+              <input id="ttsPhraseGreatInput" type="text" maxlength="18" placeholder="나이스!!" />
+            </label>
+            <label class="tts-text-field" for="ttsPhraseMegaInput">
+              <span>메가 버스트</span>
+              <input id="ttsPhraseMegaInput" type="text" maxlength="18" placeholder="와우!!" />
+            </label>
+            <label class="tts-text-field" for="ttsPhraseAllClearInput">
+              <span>올클리어</span>
+              <input id="ttsPhraseAllClearInput" type="text" maxlength="18" placeholder="올 클리어!!" />
+            </label>
+          </div>
+
+          <div class="tts-test-row">
+            <button id="ttsTestGoodButton" type="button" class="tts-test-btn">굿 테스트</button>
+            <button id="ttsTestMegaButton" type="button" class="tts-test-btn">메가 테스트</button>
+            <button id="ttsTestAllClearButton" type="button" class="tts-test-btn accent">올클리어</button>
+          </div>
+
+          <p id="ttsAdminHint" class="settings-sub">효과음이 꺼져 있으면 TTS도 같이 멈춥니다.</p>
+        </div>
+      </section>
     </section>
   </div>
 

@@ -1,5 +1,6 @@
 const BOARD_SIZE = 6;
 const COLORS = ["#ff6f91", "#2fc8a7", "#5bb8ff", "#ffd24d", "#ff9c43", "#8f7cff", "#86d93f"];
+const BLOCK_FACES = ["•ᴗ•", "•◡•", "•ω•", "•ᗜ•", "•▿•", "◕‿◕", "^o^", ">ᴗ<"];
 const BLOCK_SIZE_WEIGHTS = [
   { size: 3, weight: 0.5 },
   { size: 4, weight: 0.3 },
@@ -1543,6 +1544,25 @@ function applyCellColorVars(target, color) {
   }
 }
 
+function hashString(value) {
+  let hash = 0;
+  const text = String(value || "");
+  for (let i = 0; i < text.length; i += 1) {
+    hash = (hash * 31 + text.charCodeAt(i)) % 2147483647;
+  }
+  return hash;
+}
+
+function getFaceForSeed(seed) {
+  const hash = hashString(seed);
+  return BLOCK_FACES[hash % BLOCK_FACES.length];
+}
+
+function applyCellFace(target, seed) {
+  if (!target) return;
+  target.dataset.face = getFaceForSeed(seed);
+}
+
 function parseRgbTriplet(rgbString) {
   if (typeof rgbString !== "string") return null;
   const channels = rgbString.split(",").map((value) => Number.parseInt(value.trim(), 10));
@@ -2889,6 +2909,7 @@ function renderBoard() {
       if (top) {
         button.classList.add("filled");
         applyCellColorVars(button, top);
+        applyCellFace(button, `${x},${y}:${top}:${cell.stack.length}`);
       }
 
       const depth = cell.stack.length;
@@ -2944,6 +2965,7 @@ function createMiniGrid(block, options = {}) {
       if (cellColor) {
         mini.classList.add("fill");
         applyCellColorVars(mini, cellColor);
+        applyCellFace(mini, `${shapeX},${shapeY}:${cellColor}`);
         if (attachShapeData) {
           mini.dataset.dx = String(shapeX);
           mini.dataset.dy = String(shapeY);

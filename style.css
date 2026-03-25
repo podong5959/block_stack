@@ -1328,39 +1328,48 @@ body.danger-zone .danger-overlay {
   width: 100%;
   min-height: 100dvh;
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-  justify-items: center;
-  align-items: center;
+  place-items: center;
   padding:
     max(34px, env(safe-area-inset-top))
     22px
     max(22px, env(safe-area-inset-bottom))
     22px;
+  isolation: isolate;
+}
+
+.intro-panel::before {
+  content: "";
+  position: absolute;
+  inset: clamp(12px, 4vw, 22px);
+  border-radius: 42px;
+  background:
+    radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.86), transparent 22%),
+    radial-gradient(circle at 18% 84%, rgba(255, 174, 71, 0.14), transparent 24%),
+    radial-gradient(circle at 82% 16%, rgba(255, 127, 115, 0.14), transparent 22%),
+    linear-gradient(180deg, rgba(255, 252, 246, 0.94), rgba(255, 243, 224, 0.9));
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  box-shadow:
+    0 26px 54px rgba(188, 153, 86, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  z-index: -1;
 }
 
 .intro-panel-copy {
   position: relative;
   z-index: 1;
-  width: min(360px, 100%);
+  width: min(420px, 100%);
   margin: 0 auto;
-  align-self: center;
   display: grid;
-  gap: 16px;
+  gap: 18px;
   text-align: center;
-  padding: 34px 24px 28px;
-  border-radius: 38px;
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 252, 247, 0.98));
-  box-shadow:
-    0 26px 54px rgba(188, 153, 86, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.94);
+  padding: 28px 20px 184px;
 }
 
 .intro-mascot {
   position: relative;
-  width: 118px;
-  height: 118px;
-  margin: 0 auto 6px;
+  width: 130px;
+  height: 130px;
+  margin: 0 auto 4px;
   border-radius: 28px;
   background: linear-gradient(135deg, #6bc9fb, #4b93ff);
   box-shadow:
@@ -1418,19 +1427,21 @@ body.danger-zone .danger-overlay {
 
 .intro-copy {
   margin: 0;
-  width: min(280px, 100%);
+  width: min(320px, 100%);
   justify-self: center;
-  color: #b1a39a;
-  font-size: clamp(14px, 4vw, 16px);
-  line-height: 1.5;
+  color: #ae9a89;
+  font-size: clamp(14px, 4vw, 17px);
+  line-height: 1.55;
   font-weight: 700;
 }
 
 .intro-start-btn {
-  position: relative;
-  z-index: 1;
-  justify-self: center;
-  width: min(300px, 100%);
+  position: absolute;
+  left: 50%;
+  top: 70%;
+  z-index: 2;
+  transform: translate(-50%, -50%);
+  width: min(300px, calc(100% - 44px));
   min-height: 72px;
   padding: 0 26px;
   border: none;
@@ -1445,11 +1456,11 @@ body.danger-zone .danger-overlay {
     0 8px 0 #b9771d,
     0 22px 30px rgba(178, 118, 20, 0.24);
   cursor: pointer;
-  transition: transform 120ms ease, filter 120ms ease;
+  transition: transform 120ms ease, filter 120ms ease, opacity 180ms ease;
 }
 
 .intro-start-btn:active {
-  transform: translateY(2px);
+  transform: translate(-50%, calc(-50% + 2px));
   box-shadow:
     0 6px 0 #b9771d,
     0 12px 18px rgba(178, 118, 20, 0.18);
@@ -2212,11 +2223,11 @@ body.danger-zone .danger-overlay {
 @keyframes intro-button-leave {
   0% {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translate(-50%, -50%) scale(1);
   }
   100% {
     opacity: 0;
-    transform: translateY(22px) scale(0.96);
+    transform: translate(-50%, calc(-50% + 22px)) scale(0.96);
   }
 }
 
@@ -2287,11 +2298,13 @@ body.danger-zone .danger-overlay {
   }
 
   .intro-panel-copy {
-    padding: 30px 20px 24px;
+    width: min(360px, 100%);
+    padding: 24px 18px 164px;
   }
 
   .intro-start-btn {
+    top: 72%;
     min-height: 62px;
-    width: min(280px, 100%);
+    width: min(280px, calc(100% - 36px));
   }
 }

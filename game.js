@@ -1,5 +1,5 @@
 const BOARD_SIZE = 6;
-const COLORS = ["#ff6b6b", "#4ecdc4", "#f7b32b", "#5f6af2", "#8bce59", "#ff8e3c"];
+const COLORS = ["#ff8eab", "#79d7be", "#97deff", "#ffd384", "#ffad60", "#b39dff", "#9fda74"];
 const BLOCK_SIZE_WEIGHTS = [
   { size: 3, weight: 0.5 },
   { size: 4, weight: 0.3 },
@@ -103,6 +103,8 @@ const COMBO_VOICE_COOLDOWN_MS = 700;
 const ENDING_FILL_DURATION_MS = 640;
 const ENDING_RISE_DURATION_MS = 980;
 const INTRO_EXIT_DURATION_MS = 520;
+const MID_COLOR_UNLOCK_SCORE = 1400;
+const FINAL_COLOR_UNLOCK_SCORE = 3200;
 const PREVIEW_GRID_SIZE = 5;
 const LOW_TURN_WARNING_THRESHOLD = 5;
 const BOARD_COLOR_FLASH_MIN_POPS = 15;
@@ -1469,6 +1471,69 @@ function choose(array) {
   return array[Math.floor(Math.random() * array.length)];
 }
 
+function getUnlockedColorCount(score = state.score) {
+  if (score >= FINAL_COLOR_UNLOCK_SCORE) return 7;
+  if (score >= MID_COLOR_UNLOCK_SCORE) return 6;
+  return 5;
+}
+
+function getActivePalette(score = state.score) {
+  return COLORS.slice(0, getUnlockedColorCount(score));
+}
+
+function getBlockColorProfile(score = state.score) {
+  if (score >= FINAL_COLOR_UNLOCK_SCORE) {
+    return { maxColors: 3, multiChance: 0.88 };
+  }
+  if (score >= MID_COLOR_UNLOCK_SCORE) {
+    return { maxColors: 2, multiChance: 0.56 };
+  }
+  return { maxColors: 1, multiChance: 0 };
+}
+
+function chooseDifferentColor(palette, currentColor) {
+  let next = currentColor;
+  let guard = 0;
+  while (next === currentColor && guard < 12) {
+    next = choose(palette);
+    guard += 1;
+  }
+  return next;
+}
+
+function buildBlockColorLayout(shape, score = state.score) {
+  const palette = getActivePalette(score);
+  const profile = getBlockColorProfile(score);
+  const cellCount = shape.length;
+  let colorCount = 1;
+
+  if (profile.maxColors > 1 && cellCount > 1 && Math.random() < profile.multiChance) {
+    colorCount = randomInt(2, Math.min(profile.maxColors, cellCount));
+  }
+
+  const selectedColors = shuffleArray(palette).slice(0, colorCount);
+  if (selectedColors.length === 0) return Array(cellCount).fill(COLORS[0]);
+  if (selectedColors.length === 1) return Array(cellCount).fill(selectedColors[0]);
+
+  const ordered = shape
+    .map(([x, y], index) => ({ index, weight: y * 2 + x + (x * y) * 0.08 }))
+    .sort((a, b) => a.weight - b.weight);
+  const chunkSize = Math.ceil(cellCount / selectedColors.length);
+  const colors = Array(cellCount);
+
+  for (let i = 0; i < ordered.length; i += 1) {
+    const groupIndex = Math.min(selectedColors.length - 1, Math.floor(i / chunkSize));
+    colors[ordered[i].index] = selectedColors[groupIndex];
+  }
+
+  return colors;
+}
+
+function getBlockCellColor(block, index = 0) {
+  if (Array.isArray(block.colors) && block.colors[index]) return block.colors[index];
+  return block.color;
+}
+
 function parseRgbTriplet(rgbString) {
   if (typeof rgbString !== "string") return null;
   const channels = rgbString.split(",").map((value) => Number.parseInt(value.trim(), 10));
@@ -1572,14 +1637,9 @@ function randomStackDepth(difficulty) {
   return maxDepth;
 }
 
-function overwriteTopWithDifferentColor(cell) {
+function overwriteTopWithDifferentColor(cell, palette) {
   const current = topColor(cell);
-  let next = current;
-  let guard = 0;
-  while (next === current && guard < 10) {
-    next = choose(COLORS);
-    guard += 1;
-  }
+  const next = chooseDifferentColor(palette, current);
   if (cell.stack.length === 0) {
     cell.stack.push(next);
   } else {
@@ -1587,8 +1647,9 @@ function overwriteTopWithDifferentColor(cell) {
   }
 }
 
-function createSeededBoard(difficulty = getDifficulty(state.score)) {
+function createSeededBoard(difficulty = getDifficulty(state.score), score = state.score) {
   const board = createBoard();
+  const palette = getActivePalette(score);
   const fillCount = randomInt(difficulty.initialFilledMin, difficulty.initialFilledMax);
   const used = new Set();
 
@@ -1602,7 +1663,7 @@ function createSeededBoard(difficulty = getDifficulty(state.score)) {
     const cell = board[y][x];
     const depth = randomStackDepth(difficulty);
     for (let i = 0; i < depth; i += 1) {
-      cell.stack.push(choose(COLORS));
+      cell.stack.push(choose(palette));
     }
   }
 
@@ -1613,11 +1674,11 @@ function createSeededBoard(difficulty = getDifficulty(state.score)) {
 
     for (const row of lines.rows) {
       const x = randomInt(0, BOARD_SIZE - 1);
-      overwriteTopWithDifferentColor(board[row][x]);
+      overwriteTopWithDifferentColor(board[row][x], palette);
     }
     for (const col of lines.cols) {
       const y = randomInt(0, BOARD_SIZE - 1);
-      overwriteTopWithDifferentColor(board[y][col]);
+      overwriteTopWithDifferentColor(board[y][col], palette);
     }
     fixGuard += 1;
   }
@@ -1627,9 +1688,12 @@ function createSeededBoard(difficulty = getDifficulty(state.score)) {
 
 function generateBlock() {
   const size = weightedBlockSize();
+  const shape = choose(SHAPES[size]);
+  const colors = buildBlockColorLayout(shape);
   return {
-    color: choose(COLORS),
-    shape: choose(SHAPES[size]),
+    color: colors[0],
+    colors,
+    shape,
   };
 }
 
@@ -1655,10 +1719,11 @@ function hasAnyPlacement(block) {
 }
 
 function placeBlock(block, anchorX, anchorY) {
-  for (const [dx, dy] of block.shape) {
+  for (let i = 0; i < block.shape.length; i += 1) {
+    const [dx, dy] = block.shape[i];
     const x = anchorX + dx;
     const y = anchorY + dy;
-    state.board[y][x].stack.push(block.color);
+    state.board[y][x].stack.push(getBlockCellColor(block, i));
   }
 }
 
@@ -2021,13 +2086,14 @@ function buildEndingBoardFx() {
   if (!elements.endingBoardFx) return;
   syncEndingBoardFxBounds();
   elements.endingBoardFx.innerHTML = "";
+  const palette = getActivePalette();
   const totalCells = BOARD_SIZE * BOARD_SIZE;
   for (let y = 0; y < BOARD_SIZE; y += 1) {
     for (let x = 0; x < BOARD_SIZE; x += 1) {
       const idx = y * BOARD_SIZE + x;
       const fxCell = document.createElement("span");
       fxCell.className = "ending-fx-cell";
-      const color = topColor(state.board[y][x]) || choose(COLORS);
+      const color = topColor(state.board[y][x]) || choose(palette);
       fxCell.style.setProperty("--fx-color", color);
       fxCell.style.setProperty("--row", String(y));
       fxCell.style.setProperty("--col", String(x));
@@ -2849,7 +2915,9 @@ function createMiniGrid(block, options = {}) {
   const offsetX = centerShape ? Math.floor((gridWidth - width) / 2) : 0;
   const offsetY = centerShape ? Math.floor((gridHeight - height) / 2) : 0;
 
-  const onCells = new Set(block.shape.map(([x, y]) => `${x},${y}`));
+  const cellColorByKey = new Map(
+    block.shape.map(([x, y], index) => [`${x},${y}`, getBlockCellColor(block, index)])
+  );
   const grid = document.createElement("div");
   grid.className = "mini-grid";
   grid.style.gridTemplateColumns = `repeat(${gridWidth}, ${cellSize}px)`;
@@ -2863,9 +2931,10 @@ function createMiniGrid(block, options = {}) {
       const shapeY = y - offsetY;
       const mini = document.createElement("div");
       mini.className = "mini-cell";
-      if (onCells.has(`${shapeX},${shapeY}`)) {
+      const cellColor = cellColorByKey.get(`${shapeX},${shapeY}`);
+      if (cellColor) {
         mini.classList.add("fill");
-        mini.style.setProperty("--cell-color", block.color);
+        mini.style.setProperty("--cell-color", cellColor);
         if (attachShapeData) {
           mini.dataset.dx = String(shapeX);
           mini.dataset.dy = String(shapeY);
@@ -3213,7 +3282,7 @@ function resetGame() {
   state.gamesSinceAllClear = nextGamesSinceAllClear;
   state.allClearGuaranteeActive = nextGamesSinceAllClear >= ALL_CLEAR_GUARANTEE_GAP;
   state.allClearAwardedThisRun = false;
-  state.board = createSeededBoard(getDifficulty(0));
+  state.board = createSeededBoard(getDifficulty(0), 0);
   state.score = 0;
   state.collapse = BASE_TURN_COUNT;
   state.noClearStreak = 0;

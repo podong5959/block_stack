@@ -1,6 +1,6 @@
 const BOARD_SIZE = 6;
 const COLORS = ["#ff6f91", "#2fc8a7", "#5bb8ff", "#ffd24d", "#ff9c43", "#8f7cff", "#86d93f"];
-const BLOCK_FACES = ["•ᴗ•", "•◡•", "•ω•", "•ᗜ•", "•▿•", "◕‿◕", "^o^", ">ᴗ<"];
+const BLOCK_FACES = ["•ᴗ•", "•◡•", "•ω•", "•ᵕ•", "•▿•", "•ㅅ•", "•o•", "•-•"];
 const BLOCK_SIZE_WEIGHTS = [
   { size: 3, weight: 0.5 },
   { size: 4, weight: 0.3 },

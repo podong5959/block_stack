@@ -1091,17 +1091,19 @@ body.danger-zone .danger-overlay {
     0 1px 0 rgba(74, 92, 124, 0.18),
     0 2px 4px rgba(74, 92, 124, 0.28);
   pointer-events: none;
-  letter-spacing: -0.08em;
+  letter-spacing: -0.14em;
   line-height: 1;
+  transform-origin: center;
 }
 
 .cell.filled::after {
-  font-size: clamp(13px, 3vw, 18px);
-  transform: translateY(-1px);
+  font-size: clamp(11px, 2.4vw, 15px);
+  transform: translateY(-1px) scale(0.9);
 }
 
 .mini-cell.fill::after {
-  font-size: 10px;
+  font-size: calc(var(--mini-cell-size) * 0.3);
+  transform: translateY(-0.5px) scale(0.86);
 }
 
 .cell.preview-valid {
@@ -1458,6 +1460,28 @@ body.danger-zone .danger-overlay {
 .intro-start-btn:disabled {
   cursor: default;
   filter: saturate(0.92);
+}
+
+.intro-legal {
+  position: absolute;
+  left: 50%;
+  bottom: max(18px, env(safe-area-inset-bottom));
+  z-index: 2;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: rgba(132, 118, 102, 0.9);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.intro-legal-link {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(132, 118, 102, 0.28);
+  padding-bottom: 1px;
 }
 
 .intro-modal.is-exiting .intro-backdrop {
@@ -2305,5 +2329,10 @@ body.danger-zone .danger-overlay {
     top: 72%;
     min-height: 62px;
     width: min(280px, calc(100% - 36px));
+  }
+
+  .intro-legal {
+    gap: 8px;
+    font-size: 11px;
   }
 }
